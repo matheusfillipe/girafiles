@@ -4,92 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GiraFiles - File Upload</title>
+  <title>{{ .title }} - File Upload</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-  <style>
-    body {
-      background-color: #333;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .container {
-      flex: 1;
-      max-width: 600px;
-      margin: 0 auto;
-      padding-bottom: 50px;
-      /* Height of the footer */
-    }
-
-    h1 {
-      font-size: 24px;
-    }
-
-    table {
-      width: 100%;
-      margin-top: 100px;
-      border-collapse: separate;
-      border-spacing: 0 10px;
-    }
-
-    th,
-    td {
-      padding: 15px;
-      text-align: left;
-      border-bottom: 1px solid #444;
-    }
-
-    th {
-      background-color: #444;
-      color: #fff;
-    }
-
-    .upload-container {
-      margin-top: 50px;
-      width: 100%;
-      text-align: center;
-    }
-
-    .upload-box {
-      border: 2px dashed #666;
-      padding: 20px;
-      text-align: center;
-      vertical-align: middle;
-      display: inline-block;
-      vertical-align: middle;
-    }
-
-    input[type="file"] {
-      display: none;
-    }
-
-    label {
-      display: block;
-      background-color: #444;
-      color: #fff;
-      padding: 10px;
-      cursor: pointer;
-    }
-
-    .footer {
-      padding: 10px;
-      background-color: #222;
-      position: fixed;
-      left: 0;
-      bottom: 0;
-      width: 100%;
-    }
-
-    .github-link {
-      color: #fff;
-      text-decoration: none;
-      margin-left: 10px;
-    }
-
-  </style>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>

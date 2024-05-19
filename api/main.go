@@ -70,6 +70,10 @@ func StartServer() {
 
 	files := api.Group("/files")
 
+	router.NoRoute(func(c *gin.Context) {
+		c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
+	})
+
 	files.POST("/", func(c *gin.Context) {
 		file, err := c.FormFile("file")
 		if err != nil {
