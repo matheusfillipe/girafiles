@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GiraFiles - File Upload</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    body {
+      background-color: #333;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .container {
+      flex: 1;
+      max-width: 600px;
+      margin: 0 auto;
+      padding-bottom: 50px;
+      /* Height of the footer */
+    }
+
+    h1 {
+      font-size: 24px;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 100px;
+      border-collapse: separate;
+      border-spacing: 0 10px;
+    }
+
+    th,
+    td {
+      padding: 15px;
+      text-align: left;
+      border-bottom: 1px solid #444;
+    }
+
+    th {
+      background-color: #444;
+      color: #fff;
+    }
+
+    .upload-container {
+      margin-top: 50px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .upload-box {
+      border: 2px dashed #666;
+      padding: 20px;
+      text-align: center;
+      vertical-align: middle;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    label {
+      display: block;
+      background-color: #444;
+      color: #fff;
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .footer {
+      padding: 10px;
+      background-color: #222;
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    .github-link {
+      color: #fff;
+      text-decoration: none;
+      margin-left: 10px;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Welcome to {{ .title }}</h1>
+    <p>Store and share your files securely with {{ .title }}.</p>
+
+    <table>
+      <tr>
+        <td>Max File Size</td>
+        <td>{{ .filesize }}MB</td>
+      </tr>
+      <tr>
+        <td>Max Upload Per Day</td>
+        <td>{{ .ratelimit }} files</td>
+      </tr>
+      <tr>
+        <td>Your files will be kept for</td>
+          <td>{{ .ratelimit }} hours {{ if .storeLimit }}(The server may delete earlier if running out of space){{ end }}</td>
+      </tr>
+    </table>
+
+    {{ if .authRequired}}
+      <p>Only API uploads are accepted</p>
+    {{ else}}
+      <div class="upload-container">
+        <form action="/api/files?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
+          <div class="upload-box">
+            <label for="file-upload">Click here to upload a file</label>
+            <input type="file" id="file-upload" name="file" onchange="document.getElementById('file-upload-form').submit()">
+          </div>
+        </form>
+    </div>
+    {{ end}}
+
+  <div class="footer">
+    <a href="https://github.com/matheusfillipe/girafiles" class="github-link"><i class="fab fa-github"></i> GitHub</a>
+  </div>
+
+  <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+</body>
+
+</html>
