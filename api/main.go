@@ -122,7 +122,7 @@ func StartServer() {
 				c.JSON(http.StatusOK, gin.H{
 					"status":  "success",
 					"message": "File already exists",
-					"url":     fmt.Sprintf("%s/%s/", getHostUrl(c.Request)+files.BasePath(), n),
+					"url":     fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), n),
 				})
 				return
 			}
@@ -131,17 +131,17 @@ func StartServer() {
 		}
 
 		if params.Get("redirect") == "true" {
-			c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s/", files.BasePath(), n))
+			c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s", files.BasePath(), n))
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"status": "success",
-			"url":    fmt.Sprintf("%s/%s/", getHostUrl(c.Request)+files.BasePath(), n),
+			"url":    fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), n),
 		})
 	})
 
-	files.GET("/:name/", func(c *gin.Context) {
+	files.GET("/:name", func(c *gin.Context) {
 		var f File
 		if err := c.ShouldBindUri(&f); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err})
