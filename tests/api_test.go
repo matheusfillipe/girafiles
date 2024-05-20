@@ -1,68 +1,59 @@
 package tests
 
 import (
+	"bytes"
 	"context"
-	"fmt"
-	"net/http"
+	"io"
 	"testing"
-
-	"github.com/docker/go-connections/nat"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
-
-// Builds dockerfile and runs the container exposing the port 8585
-func CreateApiContainer(ctx context.Context, env map[string]string) (testcontainers.Container, string, error) {
-	const apiPort = 8585
-	env["PORT"] = fmt.Sprint(apiPort)
-
-	req := testcontainers.ContainerRequest{
-		FromDockerfile: testcontainers.FromDockerfile{
-			Context:    "..",
-			Dockerfile: "Dockerfile",
-			KeepImage:  true,
-		},
-		Env:          env,
-		ExposedPorts: []string{fmt.Sprint(apiPort) + "/tcp"},
-		WaitingFor:   wait.ForListeningPort(nat.Port(fmt.Sprint(apiPort))),
-	}
-	apiContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		return nil, "", err
-	}
-
-	ip, err := apiContainer.Host(ctx)
-	if err != nil {
-		return nil, "", err
-	}
-
-	port, err := apiContainer.MappedPort(ctx, nat.Port(fmt.Sprint(apiPort)))
-	if err != nil {
-		return nil, "", err
-	}
-
-	uri := fmt.Sprintf("http://%s:%d", ip, port.Int())
-	return apiContainer, uri, nil
-}
 
 func TestApi(t *testing.T) {
 	ctx := context.Background()
-	apiContainer, uri, err := CreateApiContainer(ctx, map[string]string{})
+	apiContainer, baseUrl, err := CreateApiContainer(ctx, map[string]string{
+		"FILE_PERSISTANCE_TIME": "10",
+		"FILE_SIZE_LIMIT":       "10",
+		"STORE_PATH_SIZE_LIMIT": "50",
+		"IP_MIN_RATE_LIMIT":     "3",
+		"IP_HOUR_RATE_LIMIT":    "6",
+		"IP_DAY_RATE_LIMIT":     "10",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer apiContainer.Terminate(ctx) // nolint: errcheck
-	t.Log("Running tests on", uri)
+	t.Log("Running tests on", baseUrl)
 
-	resp, err := http.Get(uri)
-	if err != nil {
-		t.Fatal(err)
+	// File too large
+	jerr := uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*11), true, nil)
+	if _, ok := jerr["error"]; !ok {
+		t.Fatalf("Expected size limit error to exist. Response was: %v", jerr)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status code %d but got %d", http.StatusOK, resp.StatusCode)
+
+	// Minute rate limit
+	for i := 0; i < 3; i++ {
+		// Upload random file
+		file := randomJpegBytes(1024 * 1024 * 9)
+		fileBytes := &bytes.Buffer{}
+		j := uploadFile(t, baseUrl+"/api/files/", io.TeeReader(file, fileBytes), false, nil)
+		if _, ok := j["url"]; !ok {
+			t.Fatalf("Expected url to exist. Response was: %v", j)
+		}
+
+		// Check if server responds with the same
+		resp := getFile(t, j["url"])
+		respBytes := &bytes.Buffer{}
+		_, err := io.Copy(respBytes, resp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(fileBytes.Bytes(), respBytes.Bytes()) {
+			t.Fatalf("Expected file to be the same")
+		}
+	}
+
+	// Upload file after minute rate limit
+	jerr = uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), true, nil)
+	if _, ok := jerr["error"]; !ok {
+		t.Fatalf("Expected rate limit error to exist. Response was: %v", jerr)
 	}
 }

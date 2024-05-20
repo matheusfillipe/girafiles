@@ -31,6 +31,16 @@ func getHostUrl(request *http.Request) string {
 	return fmt.Sprintf("%s://%s", proto, request.Host)
 }
 
+func checkAuth(c *gin.Context) bool {
+	users := GetSettings().Users
+	gin.BasicAuth(gin.Accounts(users))(c)
+	if c.IsAborted() {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return false
+	}
+	return true
+}
+
 type File struct {
 	Name string `uri:"name" binding:"required"`
 }
@@ -56,11 +66,10 @@ func StartServer() {
 		c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
 	})
 
-	if settings.IsAuthEnabled() {
-		api = router.Group(api.BasePath(), gin.BasicAuth(settings.Users))
-	}
-
 	api.Use(func(c *gin.Context) {
+		if settings.IsAuthEnabled() {
+			checkAuth(c)
+		}
 		// Handle storage size after uploading a file
 		c.Next()
 		db := GetDB()

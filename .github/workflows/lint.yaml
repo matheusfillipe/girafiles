@@ -6,8 +6,8 @@ on:
     branches: [main]
 
 jobs:
-  run-lint-checks:
-    name: lint
+  lints-and-tests:
+    name: Lints and Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
