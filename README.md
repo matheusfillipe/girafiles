@@ -36,7 +36,7 @@ Everything is stored in local disk. No database is used. No fancy things, just f
         "message": "Hourly rate limit exceeded"
     }
     ```
-- `GET /api/files/ufa.png` - Download a file
+- `GET /files/ufa.png` - Download a file
 
 ## Usage
 You can clone this repository and run it with:

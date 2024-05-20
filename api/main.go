@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -43,8 +45,7 @@ func StartServer() {
 
 	api := router.Group("/api")
 	web := router.Group("/")
-
-	files := api.Group("/files")
+	files := router.Group("/files")
 
 	router.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
@@ -55,7 +56,46 @@ func StartServer() {
 		c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
 	})
 
-	files.POST("/", func(c *gin.Context) {
+	if settings.IsAuthEnabled() {
+		api = router.Group(api.BasePath(), gin.BasicAuth(settings.Users))
+	}
+
+	api.Use(func(c *gin.Context) {
+		// Handle storage size after uploading a file
+		c.Next()
+		db := GetDB()
+		log.Printf("Checking what we can delete")
+
+		// Delete expired files
+		namesToDelete, err := db.deleteExpiredFiles()
+		if err != nil {
+			log.Printf("Error deleting expired files: %s", err)
+		}
+		for _, name := range namesToDelete {
+			err := os.Remove(filepath.Join(settings.StorePath, name))
+			if err != nil {
+				log.Printf("Error deleting file %s: %s", name, err)
+			}
+			log.Printf("Deleted file %s because it expired", name)
+		}
+
+		// Delete oldest file if storage limit is exceeded
+		if isStorageLimitExceeded() {
+			namesToDelete, err := db.deleteOldestFiles(1)
+			if err != nil {
+				log.Printf("Error deleting oldest files from database: %s", err)
+			}
+			for _, name := range namesToDelete {
+				err := os.Remove(filepath.Join(settings.StorePath, name))
+				if err != nil {
+					log.Printf("Error deleting file %s: %s", name, err)
+				}
+				log.Printf("Deleted file %s because storage limit was exceeded", name)
+			}
+		}
+	})
+
+	api.POST("/files", func(c *gin.Context) {
 		file, err := c.FormFile("file")
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -63,6 +103,14 @@ func StartServer() {
 		}
 		n, err := Upload(file, c.ClientIP())
 		if err != nil {
+			if err.Error() == DUP_ENTRY_ERROR {
+				c.JSON(http.StatusOK, gin.H{
+					"status":  "success",
+					"message": "File already exists",
+					"url":     fmt.Sprintf("%s/%s/", getHostUrl(c.Request)+files.BasePath(), n),
+				})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -107,7 +155,7 @@ func StartServer() {
 			"ratelimit":    formatIntUnlimitedIf0(settings.IPDayRateLimit),
 			"storeLimit":   settings.IsStorePathSizeLimitEnabled(),
 			"authRequired": settings.IsAuthEnabled(),
-			"uploadEP":     getHostUrl(c.Request) + files.BasePath() + "/",
+			"uploadEP":     getHostUrl(c.Request) + api.BasePath() + "/files/",
 		})
 	})
 

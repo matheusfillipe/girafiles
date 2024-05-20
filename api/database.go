@@ -10,6 +10,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const DUP_ENTRY_ERROR = "UNIQUE constraint failed: files.filename"
+
 func openDatabase() *sql.DB {
 	settings := GetSettings()
 
@@ -108,4 +110,66 @@ func (db *DBHelper) checkFileName(name string) (error, string) {
 		return err, ""
 	}
 	return nil, path
+}
+
+func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
+	settings := GetSettings()
+	if settings.FilePersistanceTime == 0 {
+		return []string{}, nil
+	}
+
+	rows, err := db.Query("SELECT filename FROM files WHERE timestamp < strftime('%s', 'now', '-? hour')", settings.FilePersistanceTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if rows == nil {
+		return []string{}, nil
+	}
+
+	_, err = db.Exec("DELETE FROM files WHERE timestamp < strftime('%s', 'now', '-? hour')", settings.FilePersistanceTime)
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for rows.Next() {
+		var filename string
+		if err := rows.Scan(&filename); err != nil {
+			return nil, err
+		}
+		files = append(files, filename)
+	}
+
+	return files, nil
+}
+
+func (db *DBHelper) deleteOldestFiles(n int) ([]string, error) {
+	settings := GetSettings()
+	if settings.StorePathSizeLimit == 0 {
+		return []string{}, nil
+	}
+
+	rows, err := db.Query("SELECT filename FROM files ORDER BY timestamp ASC LIMIT ?", n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if rows == nil {
+		return []string{}, nil
+	}
+
+	_, err = db.Exec("DELETE FROM files ORDER BY timestamp ASC LIMIT 1")
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for rows.Next() {
+		var filename string
+		if err := rows.Scan(&filename); err != nil {
+			return nil, err
+		}
+		files = append(files, filename)
+	}
+
+	return files, nil
 }

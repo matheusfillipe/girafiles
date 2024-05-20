@@ -59,6 +59,10 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 		return "", err
 	}
 
+	if len(buf)/1024/1024 > settings.FileSizeLimit {
+		return "", fmt.Errorf("File size limit exceeded. Limit is %dMB", settings.FileSizeLimit)
+	}
+
 	// Parse file and create node
 	node, err := newNode(bytes.NewReader(buf), filepath.Ext(file.Filename), ip)
 	if err != nil {
@@ -69,7 +73,7 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	dir := filepath.Join(settings.StorePath, FILEDIR)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if os.MkdirAll(dir, os.ModePerm) != nil {
-			return "", err
+			return node.name, err
 		}
 	}
 
@@ -77,20 +81,22 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	dst := filepath.Join(dir, node.name)
 	out, err := os.Create(dst)
 	if err != nil {
-		return "", err
+		return node.name, err
 	}
 	defer out.Close()
 	_, err = io.Copy(out, bytes.NewReader(buf))
 	if err != nil {
-		return "", err
+		return node.name, err
 	}
 
 	// Write node to database
 	err = GetDB().insertNode(node)
 	if err != nil {
 		// If it failes we also delete the file
-		os.Remove(dst)
-		return "", err
+		if err.Error() != DUP_ENTRY_ERROR {
+			os.Remove(dst)
+		}
+		return node.name, err
 	}
 
 	return node.name, err
@@ -113,4 +119,21 @@ func Download(n string) (string, []byte, error) {
 	m := http.DetectContentType(b[:512])
 
 	return m, b, nil
+}
+
+func isStorageLimitExceeded() bool {
+	settings := GetSettings()
+
+	if settings.StorePathSizeLimit == 0 {
+		return false
+	}
+	size := int64(0)
+	err := filepath.Walk(filepath.Join(settings.StorePath, FILEDIR), func(_ string, info os.FileInfo, _ error) error {
+		size += info.Size()
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return size/1024/1024 > int64(settings.StorePathSizeLimit)
 }
