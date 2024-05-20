@@ -54,6 +54,7 @@
           event.preventDefault();
           document.getElementById('file-upload').files = event.dataTransfer.files;
           document.getElementById('file-upload-form').submit()
+          document.querySelector('.upload-box').classList.remove('dragover')
           "
         ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
         ondragleave="document.querySelector('.upload-box').classList.remove('dragover')">
