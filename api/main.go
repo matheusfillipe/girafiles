@@ -149,7 +149,7 @@ func StartServer() {
 		}
 		m, cn, err := Download(f.Name)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": err})
+			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
 			return
 		}
 		// If mime type is supported to be displayed in the browser, display it.
