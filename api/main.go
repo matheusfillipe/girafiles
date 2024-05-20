@@ -2,51 +2,12 @@ package api
 
 import (
 	"fmt"
-	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
-
-func Upload(file *multipart.FileHeader) (string, error) {
-	var settings = GetSettings()
-
-	src, err := file.Open()
-	if err != nil {
-		return "", err
-	}
-
-	defer src.Close()
-	n := file.Filename
-	dst := fmt.Sprintf("%s/%s", settings.StorePath, n)
-	out, err := os.Create(dst)
-
-	if err != nil {
-		return "", err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, src)
-
-	return n, err
-}
-func Download(n string) (string, []byte, error) {
-	var settings = GetSettings()
-
-	dst := fmt.Sprintf("%s/%s", settings.StorePath, n)
-	b, err := os.ReadFile(dst)
-
-	if err != nil {
-		return "", nil, err
-	}
-	m := http.DetectContentType(b[:512])
-
-	return m, b, nil
-}
 
 func formatIntUnlimitedIf0(number int) string {
 	if number == 0 {
@@ -74,6 +35,7 @@ type File struct {
 
 func StartServer() {
 	var settings = GetSettings()
+	GetDB().createTable()
 
 	router := gin.Default()
 	router.LoadHTMLGlob("web/templates/*")
@@ -99,7 +61,7 @@ func StartServer() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		n, err := Upload(file)
+		n, err := Upload(file, c.ClientIP())
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -111,8 +73,8 @@ func StartServer() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"success": "Uploaded successfully",
-			"url":     fmt.Sprintf("%s/%s/", getHostUrl(c.Request)+files.BasePath(), n),
+			"status": "success",
+			"url":    fmt.Sprintf("%s/%s/", getHostUrl(c.Request)+files.BasePath(), n),
 		})
 	})
 

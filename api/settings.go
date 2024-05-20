@@ -45,7 +45,7 @@ func getDefaultSettings() *Settings {
 		Host:                "0.0.0.0",
 		Port:                "8000",
 		Debug:               false,
-		StorePath:           "/tmp/girafiles/data",
+		StorePath:           "/tmp/girafiles",
 		FilePersistanceTime: 0,
 		FileSizeLimit:       100,
 		StorePathSizeLimit:  2048,
@@ -141,12 +141,12 @@ func newSettings() *Settings {
 	return settings
 }
 
-var lock = &sync.Mutex{}
+var settingsLock = &sync.Mutex{}
 
 func GetSettings() *Settings {
 	if singleInstance == nil {
-		lock.Lock()
-		defer lock.Unlock()
+		settingsLock.Lock()
+		defer settingsLock.Unlock()
 		if singleInstance == nil {
 			singleInstance = newSettings()
 		}
