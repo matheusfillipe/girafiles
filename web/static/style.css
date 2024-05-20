@@ -9,7 +9,7 @@ body {
 
 .container {
   flex: 1;
-  max-width: 500px;
+  max-width: 80%;
   margin: 0 auto;
   padding-bottom: 50px;
   /* Height of the footer */
@@ -46,11 +46,16 @@ th {
 
 .upload-box {
   border: 2px dashed #666;
-  padding: 20px;
+  padding: 50px;
+  margin-top: 50px;
   text-align: center;
   vertical-align: middle;
   display: inline-block;
   vertical-align: middle;
+}
+
+.upload-box.dragover {
+  border-color: #fff;
 }
 
 input[type="file"] {
@@ -116,6 +121,6 @@ button {
 
 .code-container button {
   margin-top: 0;
-  padding: 0;
   padding: 10px;
+  margin: 10px;
 }

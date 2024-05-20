@@ -39,7 +39,8 @@
     <div class="code-container">
       <h4 style="text-align: start;">Curl upload</h4>
       <div class="code-line">
-          <pre style="background-color: #111;"><code>curl -s -F "file=@/path/to/file" {{ .uploadEP }} | jq -r '.url'</code></pre>
+        <pre
+          style="background-color: #111;"><code>curl -s -F "file=@/path/to/file" {{ .uploadEP }} | jq -r '.url'</code></pre>
         <button onclick="copyCode()">Copy</button>
       </div>
     </div>
@@ -48,13 +49,20 @@
     <p>Only API uploads are accepted</p>
     {{ else}}
     <div class="upload-container">
-      <form action="/api/files/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
-        <div class="upload-box">
-          <label for="file-upload">Click here to upload a file</label>
+      <div class="upload-box"
+        ondrop="
+          event.preventDefault();
+          document.getElementById('file-upload').files = event.dataTransfer.files;
+          document.getElementById('file-upload-form').submit()
+          "
+        ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
+        ondragleave="document.querySelector('.upload-box').classList.remove('dragover')">
+        <form action="/api/files/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
+          <label for="file-upload">Click or drop a file here to upload</label>
           <input type="file" id="file-upload" name="file"
             onchange="document.getElementById('file-upload-form').submit()">
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
     {{ end}}
 

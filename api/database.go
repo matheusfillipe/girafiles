@@ -88,13 +88,13 @@ func (db *DBHelper) insertNode(node *Node) error {
 	settings := GetSettings()
 	hits := db.getHitCounts(node.ip)
 
-	if hits.minute >= settings.IPMinRateLimit {
+	if settings.IPMinRateLimit > 0 && hits.minute >= settings.IPMinRateLimit {
 		return errors.New("Rate limit per minute exceeded")
 	}
-	if hits.hour >= settings.IPHourRateLimit {
+	if settings.IPHourRateLimit > 0 && hits.hour >= settings.IPHourRateLimit {
 		return errors.New("Rate limit per hour exceeded")
 	}
-	if hits.day >= settings.IPDayRateLimit {
+	if settings.IPDayRateLimit > 0 && hits.day >= settings.IPDayRateLimit {
 		return errors.New("Rate limit per day exceeded")
 	}
 

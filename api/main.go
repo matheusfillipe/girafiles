@@ -101,9 +101,15 @@ func StartServer() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		params := c.Request.URL.Query()
 		n, err := Upload(file, c.ClientIP())
 		if err != nil {
 			if err.Error() == DUP_ENTRY_ERROR {
+				if params.Get("redirect") == "true" {
+					c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s/", files.BasePath(), n))
+					return
+				}
 				c.JSON(http.StatusOK, gin.H{
 					"status":  "success",
 					"message": "File already exists",
@@ -114,7 +120,7 @@ func StartServer() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		params := c.Request.URL.Query()
+
 		if params.Get("redirect") == "true" {
 			c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s/", files.BasePath(), n))
 			return
