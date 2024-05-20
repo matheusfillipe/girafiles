@@ -7,6 +7,7 @@
   <title>{{ .title }} - File Upload</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
 </head>
 
 <body>
@@ -25,28 +26,49 @@
       </tr>
       <tr>
         <td>Your files will be kept for</td>
-          <td>{{ .ratelimit }} hours {{ if .storeLimit }}(The server may delete earlier if running out of space){{ end }}</td>
+        <td>{{ .ratelimit }} hours</td>
       </tr>
+      {{ if .storeLimit }}
+      <tr>
+        <td>Deletion</td>
+        <td>The server may delete earlier if running out of space</td>
+      </tr>
+      {{ end }}
     </table>
 
+    <div class="code-container">
+      <h4 style="text-align: start;">Curl upload</h4>
+      <div class="code-line">
+          <pre style="background-color: #111;"><code>curl -s -F "file=@/path/to/file" {{ .uploadEP }} | jq -r '.url'</code></pre>
+        <button onclick="copyCode()">Copy</button>
+      </div>
+    </div>
+
     {{ if .authRequired}}
-      <p>Only API uploads are accepted</p>
+    <p>Only API uploads are accepted</p>
     {{ else}}
-      <div class="upload-container">
-        <form action="/api/files?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
-          <div class="upload-box">
-            <label for="file-upload">Click here to upload a file</label>
-            <input type="file" id="file-upload" name="file" onchange="document.getElementById('file-upload-form').submit()">
-          </div>
-        </form>
+    <div class="upload-container">
+      <form action="/api/files/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
+        <div class="upload-box">
+          <label for="file-upload">Click here to upload a file</label>
+          <input type="file" id="file-upload" name="file"
+            onchange="document.getElementById('file-upload-form').submit()">
+        </div>
+      </form>
     </div>
     {{ end}}
 
-  <div class="footer">
-    <a href="https://github.com/matheusfillipe/girafiles" class="github-link"><i class="fab fa-github"></i> GitHub</a>
-  </div>
+    <div class="footer">
+      <a href="https://github.com/matheusfillipe/girafiles" class="github-link"><i class="fab fa-github"></i> GitHub</a>
+    </div>
 
-  <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+    <script>
+      function copyCode() {
+        const code = document.querySelector('pre code').innerText;
+        navigator.clipboard.writeText(code);
+      }
+    </script>
 </body>
 
 </html>

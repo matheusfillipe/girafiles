@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,6 +55,19 @@ func formatIntUnlimitedIf0(number int) string {
 	return fmt.Sprintf("%d", number)
 }
 
+// Get the host URL either from this server or from x-forwarded-host and x-forwarded-proto headers
+// if they are available.
+func getHostUrl(request *http.Request) string {
+	if request.Header.Get("x-forwarded-host") != "" && request.Header.Get("x-forwarded-proto") != "" {
+		return fmt.Sprintf("%s://%s", request.Header.Get("x-forwarded-proto"), request.Header.Get("x-forwarded-host"))
+	}
+	proto := "http"
+	if request.TLS != nil {
+		proto = "https"
+	}
+	return fmt.Sprintf("%s://%s", proto, request.Host)
+}
+
 type File struct {
 	Name string `uri:"name" binding:"required"`
 }
@@ -71,6 +85,11 @@ func StartServer() {
 	files := api.Group("/files")
 
 	router.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, api.BasePath()) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+			return
+		}
 		c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
 	})
 
@@ -93,7 +112,7 @@ func StartServer() {
 
 		c.JSON(http.StatusOK, gin.H{
 			"success": "Uploaded successfully",
-			"name":    n,
+			"url":     fmt.Sprintf("%s/%s/", getHostUrl(c.Request)+files.BasePath(), n),
 		})
 	})
 
@@ -108,6 +127,12 @@ func StartServer() {
 			c.JSON(http.StatusNotFound, gin.H{"error": err})
 			return
 		}
+		// If mime type is supported to be displayed in the browser, display it.
+		// otherwise, download it.
+		if isSupportedMimetype(m) {
+			c.Data(http.StatusOK, m, cn)
+			return
+		}
 		c.Header("Content-Disposition", "attachment; filename="+f.Name)
 		c.Data(http.StatusOK, m, cn)
 	})
@@ -120,6 +145,7 @@ func StartServer() {
 			"ratelimit":    formatIntUnlimitedIf0(settings.IPDayRateLimit),
 			"storeLimit":   settings.IsStorePathSizeLimitEnabled(),
 			"authRequired": settings.IsAuthEnabled(),
+			"uploadEP":     getHostUrl(c.Request) + files.BasePath() + "/",
 		})
 	})
 

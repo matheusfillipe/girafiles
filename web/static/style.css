@@ -9,7 +9,7 @@ body {
 
 .container {
   flex: 1;
-  max-width: 600px;
+  max-width: 500px;
   margin: 0 auto;
   padding-bottom: 50px;
   /* Height of the footer */
@@ -78,4 +78,44 @@ label {
   color: #fff;
   text-decoration: none;
   margin-left: 10px;
+}
+
+button {
+  background-color: #444;
+  color: #fff;
+  padding: 10px 20px;
+  border: medium;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+}
+
+.code-container {
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 40px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.code-line {
+  display: flex;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.code-container pre {
+  background-color: #444;
+  color: #fff;
+  padding: 10px;
+  margin: 0;
+  display: inline-block;
+  width: 100%;
+  white-space: pre-wrap;
+}
+
+.code-container button {
+  margin-top: 0;
+  padding: 0;
+  padding: 10px;
 }
