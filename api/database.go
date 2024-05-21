@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"log/slog"
 	"path/filepath"
 	"sync"
 
@@ -71,9 +72,9 @@ func (db *DBHelper) getHitCounts(origin string) HitCounts {
 
 	row := db.QueryRow(`
     SELECT
-        COUNT(CASE WHEN timestamp >= strftime('%s', 'now', '-1 day') THEN 1 END) AS day,
-        COUNT(CASE WHEN timestamp >= strftime('%s', 'now', '-1 hour') THEN 1 END) AS hour,
-        COUNT(CASE WHEN timestamp >= strftime('%s', 'now', '-1 minute') THEN 1 END) AS minute
+        COUNT(CASE WHEN timestamp >= strftime('%s', DATETIME(), '-1 day') THEN 1 END) AS day,
+        COUNT(CASE WHEN timestamp >= strftime('%s', DATETIME(), '-1 hour') THEN 1 END) AS hour,
+        COUNT(CASE WHEN timestamp >= strftime('%s', DATETIME(), '-1 minute') THEN 1 END) AS minute
     FROM files
     WHERE origin = ?;
   `, origin)
@@ -115,19 +116,17 @@ func (db *DBHelper) checkFileName(name string) (error, string) {
 func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
 	settings := GetSettings()
 	if settings.FilePersistanceTime == 0 {
+		slog.Debug("File persistance time is 0")
 		return []string{}, nil
 	}
 
-	rows, err := db.Query("SELECT filename FROM files WHERE timestamp < strftime('%s', 'now', '-? hour')", settings.FilePersistanceTime)
+	rows, err := db.Query("SELECT filename FROM files WHERE timestamp <= strftime('%s', DATETIME(), '-? hour')", settings.FilePersistanceTime)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	if rows == nil {
-		return []string{}, nil
-	}
 
-	_, err = db.Exec("DELETE FROM files WHERE timestamp < strftime('%s', 'now', '-? hour')", settings.FilePersistanceTime)
+	_, err = db.Exec("DELETE FROM files WHERE timestamp <= strftime('%s', DATETIME(), '-? hour')", settings.FilePersistanceTime)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +138,6 @@ func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
 		}
 		files = append(files, filename)
 	}
-
 	return files, nil
 }
 
@@ -154,11 +152,8 @@ func (db *DBHelper) deleteOldestFiles(n int) ([]string, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	if rows == nil {
-		return []string{}, nil
-	}
 
-	_, err = db.Exec("DELETE FROM files ORDER BY timestamp ASC LIMIT 1")
+	_, err = db.Exec("DELETE FROM files WHERE id IN (SELECT id FROM files ORDER BY timestamp ASC LIMIT ?)", n)
 	if err != nil {
 		return nil, err
 	}

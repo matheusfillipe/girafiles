@@ -3,12 +3,15 @@ package api
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/joho/godotenv"
 )
+
+const DEFAULT_STORE_PATH = "/tmp/girafiles"
 
 type Settings struct {
 	// Name to display in the HTML
@@ -45,7 +48,7 @@ func getDefaultSettings() *Settings {
 		Host:                "0.0.0.0",
 		Port:                "8000",
 		Debug:               false,
-		StorePath:           "/tmp/girafiles",
+		StorePath:           DEFAULT_STORE_PATH,
 		FilePersistanceTime: 0,
 		FileSizeLimit:       100,
 		StorePathSizeLimit:  2048,
@@ -66,6 +69,10 @@ func (s *Settings) IsIPRateLimitEnabled() bool {
 
 func (s *Settings) IsStorePathSizeLimitEnabled() bool {
 	return s.StorePathSizeLimit > 0
+}
+
+func (s *Settings) GetFileStoragePath() string {
+	return filepath.Join(s.StorePath, FILEDIR)
 }
 
 func parseAuthUsers(users string) map[string]string {

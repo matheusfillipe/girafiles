@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,7 +48,10 @@ type File struct {
 
 func StartServer() {
 	var settings = GetSettings()
+
+	slog.Debug("Creating database Tables...")
 	GetDB().createTable()
+	slog.Debug("Done.")
 
 	router := gin.Default()
 	router.LoadHTMLGlob("web/templates/*")
@@ -73,33 +77,42 @@ func StartServer() {
 		// Handle storage size after uploading a file
 		c.Next()
 		db := GetDB()
-		log.Printf("Checking what we can delete")
+		slog.Info("Checking what we can delete")
 
 		// Delete expired files
 		namesToDelete, err := db.deleteExpiredFiles()
 		if err != nil {
-			log.Printf("Error deleting expired files: %s", err)
+			slog.Error(fmt.Sprintf("Error deleting expired files: %s", err))
+		}
+		if len(namesToDelete) == 0 {
+			slog.Debug("No expired files to delete")
 		}
 		for _, name := range namesToDelete {
-			err := os.Remove(filepath.Join(settings.StorePath, name))
+			err := os.Remove(filepath.Join(settings.GetFileStoragePath(), name))
 			if err != nil {
-				log.Printf("Error deleting file %s: %s", name, err)
+				slog.Error(fmt.Sprintf("Error deleting file %s: %s", name, err))
+				continue
 			}
-			log.Printf("Deleted file %s because it expired", name)
+			slog.Info(fmt.Sprintf("Deleted file %s because it expired", name))
 		}
 
 		// Delete oldest file if storage limit is exceeded
 		if isStorageLimitExceeded() {
 			namesToDelete, err := db.deleteOldestFiles(1)
 			if err != nil {
-				log.Printf("Error deleting oldest files from database: %s", err)
+				slog.Error(fmt.Sprintf("Error deleting oldest files from database: %s", err))
+				return
+			}
+			if len(namesToDelete) == 0 {
+				slog.Debug("No old files to delete")
 			}
 			for _, name := range namesToDelete {
-				err := os.Remove(filepath.Join(settings.StorePath, name))
+				err := os.Remove(filepath.Join(settings.GetFileStoragePath(), name))
 				if err != nil {
-					log.Printf("Error deleting file %s: %s", name, err)
+					slog.Error(fmt.Sprintf("Error deleting file %s: %s", name, err))
+					continue
 				}
-				log.Printf("Deleted file %s because storage limit was exceeded", name)
+				slog.Info(fmt.Sprintf("Deleted file %s because storage limit was exceeded", name))
 			}
 		}
 	})
@@ -149,8 +162,11 @@ func StartServer() {
 		}
 		m, cn, err := Download(f.Name)
 		if err != nil {
-			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
-			return
+			if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
+				c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
 		// If mime type is supported to be displayed in the browser, display it.
 		// otherwise, download it.

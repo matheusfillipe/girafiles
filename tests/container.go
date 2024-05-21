@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"net/http"
+	"runtime/debug"
 	"testing"
 
 	"github.com/docker/go-connections/nat"
@@ -20,12 +21,15 @@ import (
 func CreateApiContainer(ctx context.Context, env map[string]string) (testcontainers.Container, string, error) {
 	const apiPort = 8585
 	env["PORT"] = fmt.Sprint(apiPort)
+	env["DEBUG"] = "1"
 
+	test := "true"
 	req := testcontainers.ContainerRequest{
 		FromDockerfile: testcontainers.FromDockerfile{
 			Context:    "..",
 			Dockerfile: "Dockerfile",
 			KeepImage:  true,
+			BuildArgs:  map[string]*string{"TESTING": &test},
 		},
 		Env:          env,
 		ExposedPorts: []string{fmt.Sprint(apiPort) + "/tcp"},
@@ -50,6 +54,7 @@ func CreateApiContainer(ctx context.Context, env map[string]string) (testcontain
 	}
 
 	uri := fmt.Sprintf("http://%s:%d", ip, port.Int())
+
 	return apiContainer, uri, nil
 }
 
@@ -99,6 +104,7 @@ func uploadFile(t *testing.T, url string, file io.Reader, expecServerError bool,
 	}
 
 	if resp.StatusCode != http.StatusOK && !expecServerError {
+		t.Log(string(debug.Stack()))
 		t.Fatalf("Expected status code %d but got %d: %s", http.StatusOK, resp.StatusCode, body)
 	}
 
@@ -127,4 +133,18 @@ func getFile(t *testing.T, url string) io.Reader {
 		t.Fatalf("Expected status code %d but got %d: %s", http.StatusOK, resp.StatusCode, body)
 	}
 	return resp.Body
+}
+
+func dumpContainerLogs(t *testing.T, container testcontainers.Container) {
+	ctx := context.Background()
+	logs, err := container.Logs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer logs.Close()
+	bytes, err := io.ReadAll(logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(string(bytes))
 }

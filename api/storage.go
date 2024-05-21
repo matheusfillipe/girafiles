@@ -39,7 +39,7 @@ func newNode(file io.Reader, extension string, ip string) (*Node, error) {
 	return &Node{
 		name:      hash + extension,
 		ip:        ip,
-		timestamp: time.Now().Unix(),
+		timestamp: time.Now().UTC().Unix(),
 		reader:    file,
 	}, nil
 }
@@ -109,7 +109,7 @@ func Download(n string) (string, []byte, error) {
 		return "", nil, err
 	}
 
-	dst := filepath.Join(settings.StorePath, FILEDIR, name)
+	dst := filepath.Join(settings.GetFileStoragePath(), name)
 	b, err := os.ReadFile(dst)
 
 	if err != nil {
@@ -127,8 +127,14 @@ func isStorageLimitExceeded() bool {
 	if settings.StorePathSizeLimit == 0 {
 		return false
 	}
-	size := int64(0)
-	err := filepath.Walk(filepath.Join(settings.StorePath, FILEDIR), func(_ string, info os.FileInfo, _ error) error {
+	var size int64 = 0
+	err := filepath.Walk(settings.GetFileStoragePath(), func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
 		size += info.Size()
 		return nil
 	})
