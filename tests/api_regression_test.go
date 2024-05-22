@@ -60,8 +60,7 @@ func TestRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Do not delete a duplicate upload. Regression test for duplicated files being deleted
-	// right after the upload. The timestamps should be updated to prevent this.
+	// Duplicates should not be renewed
 	j = uploadFile(t, baseUrl+"/api/files/", bytes.NewReader(dupBuf.Bytes()), false, nil)
 	if _, ok := j["url"]; !ok {
 		dumpContainerLogs(t, apiContainer)
@@ -81,8 +80,8 @@ func TestRegression(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusNotFound {
 		dumpContainerLogs(t, apiContainer)
-		t.Fatalf("Expected status code %d but got %d", http.StatusOK, resp.StatusCode)
+		t.Fatalf("Expected status code %d but got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }

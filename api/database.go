@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -87,6 +88,7 @@ func (db *DBHelper) getHitCounts(origin string) HitCounts {
 	return HitCounts{origin, minute, hour, day}
 }
 
+// Modifies node adding shortname to it
 func (db *DBHelper) insertNode(node *Node) error {
 	settings := GetSettings()
 	hits := db.getHitCounts(node.ip)
@@ -101,18 +103,42 @@ func (db *DBHelper) insertNode(node *Node) error {
 		return errors.New("Rate limit per day exceeded")
 	}
 
-	_, err := db.Exec("INSERT INTO files (filename, origin, timestamp) VALUES (?, ?, ?)", node.name, node.ip, node.timestamp)
-	return err
+	result, err := db.Exec("INSERT INTO files (filename, origin, timestamp) VALUES (?, ?, ?)", node.name, node.ip, node.timestamp)
+	if err != nil {
+		return err
+	}
+
+	idx, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	node.shortname = IdxToString(idx) + node.extension
+	return nil
 }
 
-func (db *DBHelper) checkFileName(name string) (error, string) {
-	// TODO we can introduce short filenames
+func (db *DBHelper) checkShortName(name string) (string, error) {
+	// remove the extension from the filename
+	name = strings.TrimSuffix(name, filepath.Ext(name))
+
+	var path string
+	index, err := StringToIdx(name)
+	if err != nil {
+		return "", fmt.Errorf("Failed to short filename!")
+	}
+	row := db.QueryRow("SELECT filename FROM files WHERE id = ?", index)
+	if err := row.Scan(&path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func (db *DBHelper) checkFilename(name string) (string, error) {
 	var path string
 	row := db.QueryRow("SELECT filename FROM files WHERE filename = ?", name)
 	if err := row.Scan(&path); err != nil {
-		return err, ""
+		return "", err
 	}
-	return nil, path
+	return path, nil
 }
 
 func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
@@ -209,7 +235,7 @@ func (db *DBHelper) deleteOldestFiles(n int) ([]string, error) {
 }
 
 // / Update the timestamp of a file setting it to the current time
-func (db *DBHelper) updateTimestamp(filename string, timestamp int64) error {
-	_, err := db.Exec("UPDATE files SET timestamp = ? WHERE filename = ?", timestamp, filename)
-	return err
-}
+//func (db *DBHelper) updateTimestamp(filename string, timestamp int64) error {
+//	_, err := db.Exec("UPDATE files SET timestamp = ? WHERE filename = ?", timestamp, filename)
+//	return err
+//}

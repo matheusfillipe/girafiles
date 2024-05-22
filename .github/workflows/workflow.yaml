@@ -25,7 +25,9 @@ jobs:
       - uses: pre-commit/action@v3.0.1
 
       - name: Run Tests
-        run: go test -v ./tests/...
+        run: |
+          go test -v ./api/...
+          go test -v ./tests/...
 
   docker:
     name: Publish Docker image

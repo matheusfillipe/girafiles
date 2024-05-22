@@ -21,6 +21,8 @@ var storageLock = &sync.Mutex{}
 
 type Node struct {
 	name      string
+	shortname string
+	extension string
 	ip        string
 	timestamp int64
 	reader    io.Reader
@@ -42,6 +44,7 @@ func newNode(file io.Reader, extension string, ip string) (*Node, error) {
 	}
 	return &Node{
 		name:      hash + extension,
+		extension: extension,
 		ip:        ip,
 		timestamp: time.Now().UTC().Unix(),
 		reader:    file,
@@ -84,7 +87,7 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	dir := filepath.Join(settings.StorePath, FILEDIR)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if os.MkdirAll(dir, os.ModePerm) != nil {
-			return node.name, err
+			return node.shortname, err
 		}
 	}
 
@@ -92,12 +95,12 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	dst := filepath.Join(dir, node.name)
 	out, err := os.Create(dst)
 	if err != nil {
-		return node.name, err
+		return node.shortname, err
 	}
 	defer out.Close()
 	_, err = io.Copy(out, bytes.NewReader(buf))
 	if err != nil {
-		return node.name, err
+		return node.shortname, err
 	}
 
 	// Write node to database
@@ -106,18 +109,23 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 		// If it failes we also delete the file
 		if err.Error() != DUP_ENTRY_ERROR {
 			os.Remove(dst)
+			return node.shortname, err
 		}
-		return node.name, err
+		n, errdb := GetDB().checkFilename(node.name)
+		if errdb != nil {
+			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
+		}
+		return n, err
 	}
 
-	return node.name, err
+	return node.shortname, err
 }
 func Download(n string) (string, []byte, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 
 	var settings = GetSettings()
-	err, name := GetDB().checkFileName(n)
+	name, err := GetDB().checkShortName(n)
 	if err != nil {
 		log.Println(err)
 		return "", nil, err
@@ -157,26 +165,6 @@ func isStorageLimitExceeded() bool {
 	}
 	slog.Debug(fmt.Sprintf("Storage size: %dMB > %dMB", size/1024/1024, settings.StorePathSizeLimit))
 	return size/1024/1024 > int64(settings.StorePathSizeLimit)
-}
-
-func touchFile(path string) error {
-	storageLock.Lock()
-	defer storageLock.Unlock()
-
-	cdb := GetDB()
-
-	// Get the current time
-	now := time.Now()
-	if err := cdb.updateTimestamp(path, now.UTC().Unix()); err != nil {
-		return err
-	}
-
-	// Update the modification time of the file to the current time
-	err := os.Chtimes(path, now, now)
-	if err != nil {
-		panic(err)
-	}
-	return nil
 }
 
 // Handle storage size after upload requests
