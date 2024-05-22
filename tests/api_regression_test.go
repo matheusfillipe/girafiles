@@ -8,7 +8,6 @@ import (
 
 // Regression tests
 func TestRegression(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	apiContainer, baseUrl, err := CreateApiContainer(ctx, map[string]string{
 		"FILE_PERSISTANCE_TIME": "2",
@@ -49,7 +48,7 @@ func TestRegression(t *testing.T) {
 		t.Fatalf("Expected status code %d but got %d", http.StatusNotFound, resp.StatusCode)
 	}
 
-	// Travel 11 min into the future
+	// Travel 2 hours into the future
 	if err := dbTimeOffset(t, apiContainer, -2*60*60); err != nil {
 		t.Fatal(err)
 	}

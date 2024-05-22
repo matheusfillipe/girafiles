@@ -9,7 +9,6 @@ import (
 )
 
 func TestApi(t *testing.T) {
-	t.Parallel()
 	ctx := context.Background()
 	apiContainer, baseUrl, err := CreateApiContainer(ctx, map[string]string{
 		"FILE_PERSISTANCE_TIME": "1",
