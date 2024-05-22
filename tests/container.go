@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
@@ -137,6 +138,8 @@ func getFile(t *testing.T, url string) io.Reader {
 
 func dumpContainerLogs(t *testing.T, container testcontainers.Container) {
 	ctx := context.Background()
+	// Wait a little bit for the logs to be written
+	time.Sleep(5 * time.Second)
 	logs, err := container.Logs(ctx)
 	if err != nil {
 		t.Fatal(err)

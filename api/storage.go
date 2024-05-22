@@ -11,10 +11,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 const FILEDIR = "data"
+
+var storageLock = &sync.Mutex{}
 
 type Node struct {
 	name      string
@@ -46,6 +49,9 @@ func newNode(file io.Reader, extension string, ip string) (*Node, error) {
 }
 
 func Upload(file *multipart.FileHeader, ip string) (string, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+
 	var settings = GetSettings()
 
 	src, err := file.Open()
@@ -62,6 +68,10 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 
 	if len(buf)/1024/1024 > settings.FileSizeLimit {
 		return "", fmt.Errorf("File size limit exceeded. Limit is %dMB", settings.FileSizeLimit)
+	}
+
+	if len(buf) == 0 {
+		return "", fmt.Errorf("File is empty")
 	}
 
 	// Parse file and create node
@@ -103,6 +113,9 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	return node.name, err
 }
 func Download(n string) (string, []byte, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+
 	var settings = GetSettings()
 	err, name := GetDB().checkFileName(n)
 	if err != nil {
@@ -147,6 +160,9 @@ func isStorageLimitExceeded() bool {
 }
 
 func touchFile(path string) error {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+
 	cdb := GetDB()
 
 	// Get the current time
@@ -161,4 +177,53 @@ func touchFile(path string) error {
 		panic(err)
 	}
 	return nil
+}
+
+// Handle storage size after upload requests
+func cleanup() {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+
+	settings := GetSettings()
+	cdb := GetDB()
+	slog.Info("Checking what we can delete")
+
+	// Delete expired files
+	namesToDelete, err := cdb.deleteExpiredFiles()
+	if err != nil {
+		slog.Error(fmt.Sprintf("Error deleting expired files: %s", err))
+	}
+	if len(namesToDelete) == 0 {
+		slog.Debug("No expired files to delete")
+	}
+	for _, name := range namesToDelete {
+		err := os.Remove(filepath.Join(settings.GetFileStoragePath(), name))
+		if err != nil {
+			slog.Error(fmt.Sprintf("Error deleting file %s: %s", name, err))
+			continue
+		}
+		slog.Info(fmt.Sprintf("Deleted file %s because it expired", name))
+	}
+
+	// Delete oldest file if storage limit is exceeded
+	if isStorageLimitExceeded() {
+		namesToDelete, err := cdb.deleteOldestFiles(1)
+		if err != nil {
+			slog.Error(fmt.Sprintf("Error deleting oldest files from database: %s", err))
+			return
+		}
+		if len(namesToDelete) == 0 {
+			slog.Debug("No old files to delete")
+		}
+		for _, name := range namesToDelete {
+			err := os.Remove(filepath.Join(settings.GetFileStoragePath(), name))
+			if err != nil {
+				slog.Error(fmt.Sprintf("Error deleting file %s: %s", name, err))
+				continue
+			}
+			slog.Info(fmt.Sprintf("Deleted file %s because storage limit was exceeded", name))
+		}
+	} else {
+		slog.Debug("Storage limit not exceeded")
+	}
 }

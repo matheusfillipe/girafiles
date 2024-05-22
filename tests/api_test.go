@@ -161,6 +161,11 @@ func TestStorageLimit(t *testing.T) {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
 	}
 
+	// Move 1 min into the future
+	if err := dbTimeOffset(t, apiContainer, -60); err != nil {
+		t.Fatal(err)
+	}
+
 	// Upload file
 	// Here the first should be deleted
 	j = uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), false, nil)
@@ -175,6 +180,7 @@ func TestStorageLimit(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusNotFound {
 		dumpContainerLogs(t, apiContainer)
+		dumpDatabase(t, apiContainer)
 		t.Fatalf("Expected status code %d but got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -44,52 +43,6 @@ func checkAuth(c *gin.Context) bool {
 
 type File struct {
 	Name string `uri:"name" binding:"required"`
-}
-
-// Handle storage size after upload requests
-func cleanup() {
-	var settings = GetSettings()
-	db := GetDB()
-	slog.Info("Checking what we can delete")
-
-	// Delete expired files
-	namesToDelete, err := db.deleteExpiredFiles()
-	if err != nil {
-		slog.Error(fmt.Sprintf("Error deleting expired files: %s", err))
-	}
-	if len(namesToDelete) == 0 {
-		slog.Debug("No expired files to delete")
-	}
-	for _, name := range namesToDelete {
-		err := os.Remove(filepath.Join(settings.GetFileStoragePath(), name))
-		if err != nil {
-			slog.Error(fmt.Sprintf("Error deleting file %s: %s", name, err))
-			continue
-		}
-		slog.Info(fmt.Sprintf("Deleted file %s because it expired", name))
-	}
-
-	// Delete oldest file if storage limit is exceeded
-	if isStorageLimitExceeded() {
-		namesToDelete, err := db.deleteOldestFiles(1)
-		if err != nil {
-			slog.Error(fmt.Sprintf("Error deleting oldest files from database: %s", err))
-			return
-		}
-		if len(namesToDelete) == 0 {
-			slog.Debug("No old files to delete")
-		}
-		for _, name := range namesToDelete {
-			err := os.Remove(filepath.Join(settings.GetFileStoragePath(), name))
-			if err != nil {
-				slog.Error(fmt.Sprintf("Error deleting file %s: %s", name, err))
-				continue
-			}
-			slog.Info(fmt.Sprintf("Deleted file %s because storage limit was exceeded", name))
-		}
-	} else {
-		slog.Debug("Storage limit not exceeded")
-	}
 }
 
 func StartServer() {

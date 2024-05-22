@@ -1,8 +1,11 @@
 package tests
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -32,7 +35,11 @@ func TestRegression(t *testing.T) {
 
 	// Upload file
 	dupFile := randomJpegBytes(1024 * 1024 * 9)
-	j = uploadFile(t, baseUrl+"/api/files/", dupFile, false, nil)
+	dupBuf := &bytes.Buffer{}
+	if _, err = io.Copy(dupBuf, dupFile); err != nil {
+		t.Fatal(err)
+	}
+	j = uploadFile(t, baseUrl+"/api/files/", bytes.NewReader(dupBuf.Bytes()), false, nil)
 	if _, ok := j["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
 	}
@@ -55,16 +62,27 @@ func TestRegression(t *testing.T) {
 
 	// Do not delete a duplicate upload. Regression test for duplicated files being deleted
 	// right after the upload. The timestamps should be updated to prevent this.
-	j = uploadFile(t, baseUrl+"/api/files/", dupFile, false, nil)
+	j = uploadFile(t, baseUrl+"/api/files/", bytes.NewReader(dupBuf.Bytes()), false, nil)
 	if _, ok := j["url"]; !ok {
+		dumpContainerLogs(t, apiContainer)
 		t.Fatalf("Expected url to exist. Response was: %v", j)
 	}
+	msg, ok := j["message"]
+	if !ok {
+		dumpContainerLogs(t, apiContainer)
+		t.Fatalf("Expected message to exist. Response was: %v", j)
+	}
+	if !strings.Contains(msg, "exists") {
+		dumpContainerLogs(t, apiContainer)
+		t.Fatalf("Expected message to contain 'exists'. Response was: %v", j)
+	}
+
 	resp, err = http.Get(dupUrl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusNotFound {
+	if resp.StatusCode != http.StatusOK {
 		dumpContainerLogs(t, apiContainer)
-		t.Fatalf("Expected status code %d but got %d", http.StatusNotFound, resp.StatusCode)
+		t.Fatalf("Expected status code %d but got %d", http.StatusOK, resp.StatusCode)
 	}
 }

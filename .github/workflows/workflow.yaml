@@ -19,7 +19,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.58
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v5
       - uses: pre-commit/action@v3.0.1
 
       - name: Run Tests
