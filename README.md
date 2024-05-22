@@ -55,3 +55,16 @@ You may want to set `STORE_PATH` to have permanency between restarts.
 
 See [.env.example](.env.example) for configuration options. You can use the same ones listed there
 as environment variables.
+
+
+## Disclaimer
+This project is meant for quickly allowing files to be shared and previewed with them only lasting for
+a very short period of time. It is not meant to be a permanent file storage solution. So keep in mind:
+
+1. Toy project warning. Very little testing has been done.
+2. This is 100% md5 hash collision vulnerable, meaning someone can replace your file.
+3. No encryption is used for the files.
+4. There is no privacy for the files. Anyone could easily guess valid url's. I wanted them to be short, not secure.
+5. Running multiple instances in the same `STORE_PATH` might work, but it's not tested.
+6. Code sucks because I'm not a Go developer.
+7. I do not have the need to fix any of the above myself but if you do PR's are welcome.
