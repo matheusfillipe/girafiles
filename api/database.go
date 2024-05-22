@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"path/filepath"
@@ -120,16 +121,13 @@ func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
 		return []string{}, nil
 	}
 
-	rows, err := db.Query("SELECT filename FROM files WHERE timestamp <= strftime('%s', DATETIME(), '-? hour')", settings.FilePersistanceTime)
+	query := fmt.Sprintf("SELECT filename FROM files WHERE timestamp <= strftime('%%s', DATETIME(), '-%d hour')", settings.FilePersistanceTime)
+	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	_, err = db.Exec("DELETE FROM files WHERE timestamp <= strftime('%s', DATETIME(), '-? hour')", settings.FilePersistanceTime)
-	if err != nil {
-		return nil, err
-	}
 	var files []string
 	for rows.Next() {
 		var filename string
@@ -137,6 +135,12 @@ func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
 			return nil, err
 		}
 		files = append(files, filename)
+	}
+
+	query = fmt.Sprintf("DELETE FROM files WHERE timestamp <= strftime('%%s', DATETIME(), '-%d hour')", settings.FilePersistanceTime)
+	_, err = db.Exec(query)
+	if err != nil {
+		return nil, err
 	}
 	return files, nil
 }

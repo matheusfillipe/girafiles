@@ -150,8 +150,7 @@ func TestApi(t *testing.T) {
 func TestStorageLimit(t *testing.T) {
 	ctx := context.Background()
 	apiContainer, baseUrl, err := CreateApiContainer(ctx, map[string]string{
-		"FILE_PERSISTANCE_TIME": "1",
-		"FILE_SIZE_LIMIT":       "10",
+		"STORE_PATH_SIZE_LIMIT": "10",
 	})
 	if err != nil {
 		t.Fatal(err)

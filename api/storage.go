@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -141,5 +142,6 @@ func isStorageLimitExceeded() bool {
 	if err != nil {
 		log.Fatal(err)
 	}
+	slog.Debug(fmt.Sprintf("Storage size: %dMB > %dMB", size/1024/1024, settings.StorePathSizeLimit))
 	return size/1024/1024 > int64(settings.StorePathSizeLimit)
 }
