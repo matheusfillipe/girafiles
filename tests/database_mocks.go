@@ -6,9 +6,12 @@ import (
 	"io"
 	"testing"
 
+	"github.com/matheusfillipe/girafiles/api"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/testcontainers/testcontainers-go"
 )
+
+const dbPath = api.DEFAULT_STORE_PATH + "/files.db"
 
 func logReader(t *testing.T, reader io.Reader) {
 	bytes, err := io.ReadAll(reader)
@@ -18,7 +21,7 @@ func logReader(t *testing.T, reader io.Reader) {
 	t.Log(string(bytes))
 }
 
-func dbTimeOffset(t *testing.T, dbPath string, container testcontainers.Container, offset int) error {
+func dbTimeOffset(t *testing.T, container testcontainers.Container, offset int) error {
 	_, reader, err := container.Exec(context.Background(), []string{"sqlite3", dbPath, fmt.Sprintf("UPDATE files SET timestamp = timestamp + %d", offset)})
 	if err != nil {
 		return err
@@ -27,7 +30,7 @@ func dbTimeOffset(t *testing.T, dbPath string, container testcontainers.Containe
 	return nil
 }
 
-func dumpDatabase(t *testing.T, dbPath string, container testcontainers.Container) {
+func dumpDatabase(t *testing.T, container testcontainers.Container) {
 	_, reader, err := container.Exec(context.Background(), []string{"sqlite3", dbPath, "SELECT * FROM files;"})
 	if err != nil {
 		t.Fatal(err)

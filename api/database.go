@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -117,8 +118,42 @@ func (db *DBHelper) checkFileName(name string) (error, string) {
 func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
 	settings := GetSettings()
 	if settings.FilePersistanceTime == 0 {
-		slog.Debug("File persistance time is 0")
+		slog.Debug("File persistance time is unlimited")
 		return []string{}, nil
+	}
+
+	// Just debugging
+	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+		query := fmt.Sprintf(`
+      SELECT filename,
+        timestamp <= strftime('%%s', DATETIME(), '-%d hour') AS expired,
+        timestamp || '(db)' || ' <= ' || strftime('%%s', DATETIME(), '-%d hour')
+      FROM files
+    `,
+			settings.FilePersistanceTime,
+			settings.FilePersistanceTime,
+		)
+		rows, err := db.Query(query)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var results []map[string]string
+		for rows.Next() {
+			var filename string
+			var expired bool
+			var reason string
+			if err := rows.Scan(&filename, &expired, &reason); err != nil {
+				return nil, err
+			}
+			results = append(results, map[string]string{
+				"filename": filename,
+				"expired":  fmt.Sprintf("%t", expired),
+				"reason":   reason,
+			})
+		}
+		slog.Debug(fmt.Sprintf("Files and their expiration status: %v", results))
 	}
 
 	query := fmt.Sprintf("SELECT filename FROM files WHERE timestamp <= strftime('%%s', DATETIME(), '-%d hour')", settings.FilePersistanceTime)
@@ -171,4 +206,10 @@ func (db *DBHelper) deleteOldestFiles(n int) ([]string, error) {
 	}
 
 	return files, nil
+}
+
+// / Update the timestamp of a file setting it to the current time
+func (db *DBHelper) updateTimestamp(filename string, timestamp int64) error {
+	_, err := db.Exec("UPDATE files SET timestamp = ? WHERE filename = ?", timestamp, filename)
+	return err
 }

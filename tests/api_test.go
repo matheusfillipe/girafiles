@@ -6,8 +6,6 @@ import (
 	"io"
 	"net/http"
 	"testing"
-
-	api "github.com/matheusfillipe/girafiles/api"
 )
 
 func TestApi(t *testing.T) {
@@ -67,10 +65,8 @@ func TestApi(t *testing.T) {
 		t.Fatalf("Expected rate limit error to exist. Response was: %v", jerr)
 	}
 
-	dbPath := api.DEFAULT_STORE_PATH + "/files.db"
-
 	// Change time in database to simulate 5 minutes later
-	if err := dbTimeOffset(t, dbPath, apiContainer, -5*60); err != nil {
+	if err := dbTimeOffset(t, apiContainer, -5*60); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,7 +77,7 @@ func TestApi(t *testing.T) {
 		fileBytes := &bytes.Buffer{}
 		j := uploadFile(t, baseUrl+"/api/files/", io.TeeReader(file, fileBytes), true, nil)
 		if _, ok := j["url"]; !ok {
-			dumpDatabase(t, api.DEFAULT_STORE_PATH, apiContainer)
+			dumpDatabase(t, apiContainer)
 			t.Fatalf("Expected url to exist. Response was: %v", j)
 		}
 
@@ -105,7 +101,7 @@ func TestApi(t *testing.T) {
 	}
 
 	// Change time in database to simulate 1 hour later
-	if err := dbTimeOffset(t, dbPath, apiContainer, -120*60); err != nil {
+	if err := dbTimeOffset(t, apiContainer, -120*60); err != nil {
 		t.Fatal(err)
 	}
 
@@ -116,7 +112,7 @@ func TestApi(t *testing.T) {
 		fileBytes := &bytes.Buffer{}
 		j := uploadFile(t, baseUrl+"/api/files/", io.TeeReader(file, fileBytes), true, nil)
 		if _, ok := j["url"]; !ok {
-			dumpDatabase(t, dbPath, apiContainer)
+			dumpDatabase(t, apiContainer)
 			t.Fatalf("Expected url to exist. Response was: %v", j)
 		}
 
@@ -139,7 +135,7 @@ func TestApi(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusNotFound {
 		dumpContainerLogs(t, apiContainer)
-		dumpDatabase(t, dbPath, apiContainer)
+		dumpDatabase(t, apiContainer)
 		t.Fatalf("Expected status code %d but got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }

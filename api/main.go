@@ -147,6 +147,9 @@ func StartServer() {
 					"message": "File already exists",
 					"url":     fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), n),
 				})
+				if err := touchFile(n); err != nil {
+					slog.Error(fmt.Sprintf("Error touching file %s: %s", n, err))
+				}
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

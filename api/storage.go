@@ -145,3 +145,20 @@ func isStorageLimitExceeded() bool {
 	slog.Debug(fmt.Sprintf("Storage size: %dMB > %dMB", size/1024/1024, settings.StorePathSizeLimit))
 	return size/1024/1024 > int64(settings.StorePathSizeLimit)
 }
+
+func touchFile(path string) error {
+	cdb := GetDB()
+
+	// Get the current time
+	now := time.Now()
+	if err := cdb.updateTimestamp(path, now.UTC().Unix()); err != nil {
+		return err
+	}
+
+	// Update the modification time of the file to the current time
+	err := os.Chtimes(path, now, now)
+	if err != nil {
+		panic(err)
+	}
+	return nil
+}
