@@ -20,6 +20,8 @@ jobs:
         with:
           version: v1.58
       - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: pre-commit/action@v3.0.1
 
       - name: Run Tests
