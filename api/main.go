@@ -117,6 +117,10 @@ func StartServer() {
 		})
 	})
 
+	// api.PUT("/files/:bucket/:name", func(c *gin.Context) {
+
+	// }
+
 	files.GET("/:name", func(c *gin.Context) {
 		var f File
 		if err := c.ShouldBindUri(&f); err != nil {
