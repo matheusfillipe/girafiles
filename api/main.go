@@ -119,6 +119,7 @@ func StartServer() {
 	slog.Debug("Done.")
 
 	router := gin.Default()
+	router.RemoveExtraSlash = true
 	router.LoadHTMLGlob("web/templates/*")
 	router.Static("/static", "web/static")
 
