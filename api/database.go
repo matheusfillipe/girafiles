@@ -52,8 +52,7 @@ func (db *DBHelper) createTable() {
         bucket TEXT,
         alias TEXT,
         origin TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        UNIQUE (filename, bucket, alias) ON CONFLICT REPLACE
+        timestamp INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS files_origin ON files (origin);
     CREATE INDEX IF NOT EXISTS files_filename ON files (filename);
@@ -125,6 +124,30 @@ func (db *DBHelper) insertNode(node *Node) error {
 }
 
 func (db *DBHelper) insertAlias(bucket string, alias string, node *Node) error {
+	// First check if the alias is already in use
+	rows := db.QueryRow("SELECT filename FROM files WHERE bucket = ? AND alias = ? LIMIT 1", bucket, alias)
+	var filename string
+	err := rows.Scan(&filename)
+	if err == nil {
+		return errors.New(DUP_ENTRY_ERROR)
+	} else if err != sql.ErrNoRows {
+		return err
+	}
+
+	// Then check if the filename is already in use
+	fileCount := 0
+	rows = db.QueryRow("SELECT count(*) FROM files WHERE filename = ?", node.name)
+	err = rows.Scan(&fileCount)
+	if err != nil {
+		return err
+	}
+
+	// If the filename is already in use, we insert it as {filename}@{count} just to avoid constraint errors
+	if fileCount > 0 {
+		node.name = fmt.Sprintf("%s@%d", node.name, fileCount)
+	}
+
+	// Now we can insert the alias
 	result, err := db.Exec("INSERT INTO files (filename, origin, timestamp, bucket, alias) VALUES (?, ?, ?, ?, ?)", node.name, node.ip, node.timestamp, bucket, alias)
 	if err != nil {
 		return err
@@ -134,7 +157,7 @@ func (db *DBHelper) insertAlias(bucket string, alias string, node *Node) error {
 		return err
 	}
 	node.shortname = IdxToString(idx) + node.extension
-	return nil
+	return err
 }
 
 func (db *DBHelper) checkShortName(name string) (string, error) {
@@ -153,13 +176,16 @@ func (db *DBHelper) checkShortName(name string) (string, error) {
 	return path, nil
 }
 
-func (db *DBHelper) checkFilename(name string) (string, error) {
-	var path string
-	row := db.QueryRow("SELECT filename FROM files WHERE filename = ?", name)
-	if err := row.Scan(&path); err != nil {
+func (db *DBHelper) getShortnameForFilename(filename string) (string, error) {
+	var idx int64
+	var dbFilename string
+	row := db.QueryRow("SELECT id, filename FROM files WHERE filename = ?", filename)
+	if err := row.Scan(&idx, &dbFilename); err != nil {
 		return "", err
 	}
-	return path, nil
+	shortname := IdxToString(idx)
+	ext := filepath.Ext(dbFilename)
+	return shortname + ext, nil
 }
 
 func (db *DBHelper) checkAlias(bucket string, alias string) (string, error) {

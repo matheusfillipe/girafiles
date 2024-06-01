@@ -55,8 +55,8 @@ func (f File) GetName() string {
 }
 
 type FileBucket struct {
-	Name   string `uri:"alias" binding:"required"`
 	Bucket string `uri:"name" binding:"required"`
+	Name   string `uri:"alias" binding:"required"`
 }
 
 // GetName implements FileRequest.
@@ -159,9 +159,10 @@ func StartServer() {
 		handleUpload(c, n, err, params, files)
 	})
 
-	api.PUT("/files/:bucket/:name", func(c *gin.Context) {
+	api.PUT("files/:name/:alias", func(c *gin.Context) {
 		var fb FileBucket
 		if err := c.ShouldBindUri(&fb); err != nil {
+			slog.Error(fmt.Sprintf("Failed to upload file: %s", err.Error()))
 			c.JSON(http.StatusBadRequest, gin.H{"error": err})
 			return
 		}

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -102,6 +103,21 @@ func saveToDisk(file *multipart.FileHeader, ip string) (string, *Node, error) {
 	return dst, node, nil
 }
 
+func handleDbUploadErr(err error, dst string, node *Node) (string, error) {
+	db := GetDB()
+
+	// If it fails we also delete the file
+	if err.Error() != DUP_ENTRY_ERROR {
+		os.Remove(dst)
+		return node.shortname, err
+	}
+	shortname, errdb := db.getShortnameForFilename(node.name)
+	if errdb != nil {
+		return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
+	}
+	return shortname, err
+}
+
 func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
@@ -120,16 +136,7 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	// Write node to database
 	err = db.insertNode(node)
 	if err != nil {
-		// If it failes we also delete the file
-		if err.Error() != DUP_ENTRY_ERROR {
-			os.Remove(dst)
-			return node.shortname, err
-		}
-		n, errdb := db.checkFilename(node.name)
-		if errdb != nil {
-			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
-		}
-		return n, err
+		return handleDbUploadErr(err, dst, node)
 	}
 	return node.shortname, err
 }
@@ -152,64 +159,51 @@ func UploadToBucket(file *multipart.FileHeader, ip string, bucket string, name s
 	// Write node to database
 	err = db.insertAlias(bucket, name, node)
 	if err != nil {
-		// If it failes we also delete the file
-		if err.Error() != DUP_ENTRY_ERROR {
-			os.Remove(dst)
-			return node.shortname, err
-		}
-		n, errdb := db.checkFilename(node.name)
-		if errdb != nil {
-			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
-		}
-		return n, err
+		return handleDbUploadErr(err, dst, node)
 	}
 	return node.shortname, err
+}
+
+func loadFromDisk(name string) (string, []byte, error) {
+	settings := GetSettings()
+
+	name = strings.SplitN(name, "@", 2)[0]
+
+	dst := filepath.Join(settings.GetFileStoragePath(), name)
+	b, err := os.ReadFile(dst)
+
+	if err != nil {
+		log.Println(err)
+		return "", nil, err
+	}
+	m := http.DetectContentType(b[:512])
+
+	return m, b, nil
 }
 
 func Download(n string) (string, []byte, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 
-	var settings = GetSettings()
 	name, err := GetDB().checkShortName(n)
 	if err != nil {
 		log.Println(err)
 		return "", nil, err
 	}
 
-	dst := filepath.Join(settings.GetFileStoragePath(), name)
-	b, err := os.ReadFile(dst)
-
-	if err != nil {
-		log.Println(err)
-		return "", nil, err
-	}
-	m := http.DetectContentType(b[:512])
-
-	return m, b, nil
+	return loadFromDisk(name)
 }
 
 func DownloadFromBucket(bucket string, alias string) (string, []byte, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 
-	var settings = GetSettings()
 	name, err := GetDB().checkAlias(bucket, alias)
 	if err != nil {
 		log.Println(err)
 		return "", nil, err
 	}
-
-	dst := filepath.Join(settings.GetFileStoragePath(), name)
-	b, err := os.ReadFile(dst)
-
-	if err != nil {
-		log.Println(err)
-		return "", nil, err
-	}
-	m := http.DetectContentType(b[:512])
-
-	return m, b, nil
+	return loadFromDisk(name)
 }
 
 func isStorageLimitExceeded() bool {
