@@ -8,12 +8,13 @@ import (
 	"log"
 	"log/slog"
 	"mime/multipart"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
 const FILEDIR = "data"
@@ -179,7 +180,7 @@ func loadFromDisk(name string) (string, []byte, error) {
 		log.Println(err)
 		return "", nil, err
 	}
-	m := http.DetectContentType(b[:512])
+	m := mimetype.Detect(b).String()
 
 	return m, b, nil
 }
