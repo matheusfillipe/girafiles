@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -172,14 +173,21 @@ func StartServer() {
 			return
 		}
 
-		file, err := c.FormFile("file")
+		// Receive file as request content
+		bytes, err := c.GetRawData()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
+		file := multipart.FileHeader{
+			Filename: fb.Name,
+			Header:   map[string][]string{},
+			Size:     int64(len(bytes)),
+		}
+
 		params := c.Request.URL.Query()
-		n, err := UploadToBucket(file, c.ClientIP(), fb.Bucket, fb.Name)
+		n, err := UploadToBucket(&file, c.ClientIP(), fb.Bucket, fb.Name)
 		handleUpload(c, n, err, params, files)
 	})
 
