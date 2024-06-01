@@ -51,43 +51,40 @@ func newNode(file io.Reader, extension string, ip string) (*Node, error) {
 	}, nil
 }
 
-func Upload(file *multipart.FileHeader, ip string) (string, error) {
-	storageLock.Lock()
-	defer storageLock.Unlock()
-
+func saveToDisk(file *multipart.FileHeader, ip string) (string, *Node, error) {
 	var settings = GetSettings()
 
 	src, err := file.Open()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer src.Close()
 
 	// Create buffer to read multiple times from memory
 	buf, err := io.ReadAll(src)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	if len(buf)/1024/1024 > settings.FileSizeLimit {
-		return "", fmt.Errorf("File size limit exceeded. Limit is %dMB", settings.FileSizeLimit)
+		return "", nil, fmt.Errorf("File size limit exceeded. Limit is %dMB", settings.FileSizeLimit)
 	}
 
 	if len(buf) == 0 {
-		return "", fmt.Errorf("File is empty")
+		return "", nil, fmt.Errorf("File is empty")
 	}
 
 	// Parse file and create node
 	node, err := newNode(bytes.NewReader(buf), filepath.Ext(file.Filename), ip)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	// Create data directory if it doesn't exist
 	dir := filepath.Join(settings.StorePath, FILEDIR)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if os.MkdirAll(dir, os.ModePerm) != nil {
-			return node.shortname, err
+			return "", node, err
 		}
 	}
 
@@ -95,37 +92,109 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	dst := filepath.Join(dir, node.name)
 	out, err := os.Create(dst)
 	if err != nil {
-		return node.shortname, err
+		return "", node, err
 	}
 	defer out.Close()
 	_, err = io.Copy(out, bytes.NewReader(buf))
 	if err != nil {
-		return node.shortname, err
+		return "", node, err
+	}
+	return dst, node, nil
+}
+
+func Upload(file *multipart.FileHeader, ip string) (string, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+	db := GetDB()
+
+	if err := db.CheckRateLimit(ip); err != nil {
+		return "", err
+	}
+
+	// Upload file to disk
+	dst, node, err := saveToDisk(file, ip)
+	if err != nil {
+		return "", err
 	}
 
 	// Write node to database
-	err = GetDB().insertNode(node)
+	err = db.insertNode(node)
 	if err != nil {
 		// If it failes we also delete the file
 		if err.Error() != DUP_ENTRY_ERROR {
 			os.Remove(dst)
 			return node.shortname, err
 		}
-		n, errdb := GetDB().checkFilename(node.name)
+		n, errdb := db.checkFilename(node.name)
 		if errdb != nil {
 			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
 		}
 		return n, err
 	}
-
 	return node.shortname, err
 }
+
+func UploadToBucket(file *multipart.FileHeader, ip string, bucket string, name string) (string, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+	db := GetDB()
+
+	if err := db.CheckRateLimit(ip); err != nil {
+		return "", err
+	}
+
+	// Upload file to disk
+	dst, node, err := saveToDisk(file, ip)
+	if err != nil {
+		return "", err
+	}
+
+	// Write node to database
+	err = db.insertAlias(bucket, name, node)
+	if err != nil {
+		// If it failes we also delete the file
+		if err.Error() != DUP_ENTRY_ERROR {
+			os.Remove(dst)
+			return node.shortname, err
+		}
+		n, errdb := db.checkFilename(node.name)
+		if errdb != nil {
+			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
+		}
+		return n, err
+	}
+	return node.shortname, err
+}
+
 func Download(n string) (string, []byte, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 
 	var settings = GetSettings()
 	name, err := GetDB().checkShortName(n)
+	if err != nil {
+		log.Println(err)
+		return "", nil, err
+	}
+
+	dst := filepath.Join(settings.GetFileStoragePath(), name)
+	b, err := os.ReadFile(dst)
+
+	if err != nil {
+		log.Println(err)
+		return "", nil, err
+	}
+	m := http.DetectContentType(b[:512])
+
+	return m, b, nil
+}
+
+func DownloadFromBucket(bucket string, alias string) (string, []byte, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+
+	var settings = GetSettings()
+	name, err := GetDB().checkAlias(bucket, alias)
 	if err != nil {
 		log.Println(err)
 		return "", nil, err

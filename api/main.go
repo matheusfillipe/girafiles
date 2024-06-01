@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -41,8 +42,73 @@ func checkAuth(c *gin.Context) bool {
 	return true
 }
 
+type FileParams interface {
+	GetName() string
+}
+
 type File struct {
 	Name string `uri:"name" binding:"required"`
+}
+
+func (f File) GetName() string {
+	return f.Name
+}
+
+type FileBucket struct {
+	Name   string `uri:"alias" binding:"required"`
+	Bucket string `uri:"name" binding:"required"`
+}
+
+// GetName implements FileRequest.
+func (fb FileBucket) GetName() string {
+	return fb.Name
+}
+
+func handleUpload(c *gin.Context, filename string, err error, params url.Values, files *gin.RouterGroup) {
+	if err != nil {
+		if err.Error() == DUP_ENTRY_ERROR {
+			if params.Get("redirect") == "true" {
+				c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s/", files.BasePath(), filename))
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"status":  "success",
+				"message": "File already exists",
+				"url":     fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), filename),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if params.Get("redirect") == "true" {
+		c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s", files.BasePath(), filename))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"url":    fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), filename),
+	})
+}
+
+func deliverFile(c *gin.Context, err error, f FileParams, m string, cn []byte) {
+	if err != nil {
+		if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
+			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+	// If mime type is supported to be displayed in the browser, display it.
+	// otherwise, download it.
+	if isSupportedMimetype(m) {
+		c.Data(http.StatusOK, m, cn)
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename="+f.GetName())
+	c.Data(http.StatusOK, m, cn)
 }
 
 func StartServer() {
@@ -89,37 +155,31 @@ func StartServer() {
 
 		params := c.Request.URL.Query()
 		n, err := Upload(file, c.ClientIP())
-		if err != nil {
-			if err.Error() == DUP_ENTRY_ERROR {
-				if params.Get("redirect") == "true" {
-					c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s/", files.BasePath(), n))
-					return
-				}
-				c.JSON(http.StatusOK, gin.H{
-					"status":  "success",
-					"message": "File already exists",
-					"url":     fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), n),
-				})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		if params.Get("redirect") == "true" {
-			c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s", files.BasePath(), n))
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"status": "success",
-			"url":    fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), n),
-		})
+		handleUpload(c, n, err, params, files)
 	})
 
-	// api.PUT("/files/:bucket/:name", func(c *gin.Context) {
+	api.PUT("/files/:bucket/:name", func(c *gin.Context) {
+		var fb FileBucket
+		if err := c.ShouldBindUri(&fb); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err})
+			return
+		}
 
-	// }
+		if len(fb.Bucket) > 64 || len(fb.Bucket) < 4 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Bucket name must be between 4 and 64 characters"})
+			return
+		}
+
+		file, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		params := c.Request.URL.Query()
+		n, err := UploadToBucket(file, c.ClientIP(), fb.Bucket, fb.Name)
+		handleUpload(c, n, err, params, files)
+	})
 
 	files.GET("/:name", func(c *gin.Context) {
 		var f File
@@ -128,21 +188,17 @@ func StartServer() {
 			return
 		}
 		m, cn, err := Download(f.Name)
-		if err != nil {
-			if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
-				c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		// If mime type is supported to be displayed in the browser, display it.
-		// otherwise, download it.
-		if isSupportedMimetype(m) {
-			c.Data(http.StatusOK, m, cn)
+		deliverFile(c, err, f, m, cn)
+	})
+
+	files.GET("/:name/:alias", func(c *gin.Context) {
+		var fb FileBucket
+		if err := c.ShouldBindUri(&fb); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err})
 			return
 		}
-		c.Header("Content-Disposition", "attachment; filename="+f.Name)
-		c.Data(http.StatusOK, m, cn)
+		m, cn, err := DownloadFromBucket(fb.Bucket, fb.Name)
+		deliverFile(c, err, fb, m, cn)
 	})
 
 	web.GET("/", func(c *gin.Context) {

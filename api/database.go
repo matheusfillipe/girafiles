@@ -49,12 +49,17 @@ func (db *DBHelper) createTable() {
     CREATE TABLE IF NOT EXISTS files (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         filename TEXT NOT NULL UNIQUE,
+        bucket TEXT,
+        alias TEXT,
         origin TEXT NOT NULL,
-        timestamp INTEGER NOT NULL
+        timestamp INTEGER NOT NULL,
+        UNIQUE (filename, bucket, alias) ON CONFLICT REPLACE
     );
     CREATE INDEX IF NOT EXISTS files_origin ON files (origin);
     CREATE INDEX IF NOT EXISTS files_filename ON files (filename);
     CREATE INDEX IF NOT EXISTS files_timestamp ON files (timestamp);
+    CREATE INDEX IF NOT EXISTS files_bucket ON files (bucket);
+    CREATE INDEX IF NOT EXISTS files_alias ON files (alias);
   `)
 	if err != nil {
 		log.Fatal(err)
@@ -88,10 +93,9 @@ func (db *DBHelper) getHitCounts(origin string) HitCounts {
 	return HitCounts{origin, minute, hour, day}
 }
 
-// Modifies node adding shortname to it
-func (db *DBHelper) insertNode(node *Node) error {
+func (db *DBHelper) CheckRateLimit(ip string) error {
 	settings := GetSettings()
-	hits := db.getHitCounts(node.ip)
+	hits := db.getHitCounts(ip)
 
 	if settings.IPMinRateLimit > 0 && hits.minute >= settings.IPMinRateLimit {
 		return errors.New("Rate limit per minute exceeded")
@@ -102,12 +106,29 @@ func (db *DBHelper) insertNode(node *Node) error {
 	if settings.IPDayRateLimit > 0 && hits.day >= settings.IPDayRateLimit {
 		return errors.New("Rate limit per day exceeded")
 	}
+	return nil
+}
 
+// Modifies node adding shortname to it
+func (db *DBHelper) insertNode(node *Node) error {
 	result, err := db.Exec("INSERT INTO files (filename, origin, timestamp) VALUES (?, ?, ?)", node.name, node.ip, node.timestamp)
 	if err != nil {
 		return err
 	}
 
+	idx, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	node.shortname = IdxToString(idx) + node.extension
+	return nil
+}
+
+func (db *DBHelper) insertAlias(bucket string, alias string, node *Node) error {
+	result, err := db.Exec("INSERT INTO files (filename, origin, timestamp, bucket, alias) VALUES (?, ?, ?, ?, ?)", node.name, node.ip, node.timestamp, bucket, alias)
+	if err != nil {
+		return err
+	}
 	idx, err := result.LastInsertId()
 	if err != nil {
 		return err
@@ -135,6 +156,15 @@ func (db *DBHelper) checkShortName(name string) (string, error) {
 func (db *DBHelper) checkFilename(name string) (string, error) {
 	var path string
 	row := db.QueryRow("SELECT filename FROM files WHERE filename = ?", name)
+	if err := row.Scan(&path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func (db *DBHelper) checkAlias(bucket string, alias string) (string, error) {
+	var path string
+	row := db.QueryRow("SELECT filename FROM files WHERE bucket = ? AND alias = ?", bucket, alias)
 	if err := row.Scan(&path); err != nil {
 		return "", err
 	}
