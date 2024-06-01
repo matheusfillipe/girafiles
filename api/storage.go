@@ -52,31 +52,23 @@ func newNode(file io.Reader, extension string, ip string) (*Node, error) {
 	}, nil
 }
 
-func saveToDisk(file *multipart.FileHeader, ip string) (string, *Node, error) {
+func saveToDisk(src io.Reader, filename string, ip string) (string, *Node, error) {
 	var settings = GetSettings()
-
-	src, err := file.Open()
-	if err != nil {
-		return "", nil, err
-	}
-	defer src.Close()
 
 	// Create buffer to read multiple times from memory
 	buf, err := io.ReadAll(src)
 	if err != nil {
 		return "", nil, err
 	}
-
+	if len(buf) == 0 {
+		return "", nil, fmt.Errorf("File is empty")
+	}
 	if len(buf)/1024/1024 > settings.FileSizeLimit {
 		return "", nil, fmt.Errorf("File size limit exceeded. Limit is %dMB", settings.FileSizeLimit)
 	}
 
-	if len(buf) == 0 {
-		return "", nil, fmt.Errorf("File is empty")
-	}
-
 	// Parse file and create node
-	node, err := newNode(bytes.NewReader(buf), filepath.Ext(file.Filename), ip)
+	node, err := newNode(bytes.NewReader(buf), filepath.Ext(filename), ip)
 	if err != nil {
 		return "", nil, err
 	}
@@ -107,15 +99,20 @@ func handleDbUploadErr(err error, dst string, node *Node) (string, error) {
 	db := GetDB()
 
 	// If it fails we also delete the file
-	if err.Error() != DUP_ENTRY_ERROR {
+	if err.Error() == DUP_ENTRY_ERROR {
+		shortname, errdb := db.getShortnameForFilename(node.name)
+		if errdb != nil {
+			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
+		}
+		return shortname, err
+	}
+	if err.Error() == DUP_ALIAS_ERROR {
 		os.Remove(dst)
-		return node.shortname, err
+		return node.shortname, fmt.Errorf("This bucket/alias is already in use")
 	}
-	shortname, errdb := db.getShortnameForFilename(node.name)
-	if errdb != nil {
-		return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
-	}
-	return shortname, err
+
+	os.Remove(dst)
+	return node.shortname, err
 }
 
 func Upload(file *multipart.FileHeader, ip string) (string, error) {
@@ -127,8 +124,14 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 		return "", err
 	}
 
+	src, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
 	// Upload file to disk
-	dst, node, err := saveToDisk(file, ip)
+	dst, node, err := saveToDisk(src, file.Filename, ip)
 	if err != nil {
 		return "", err
 	}
@@ -141,7 +144,7 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	return node.shortname, err
 }
 
-func UploadToBucket(file *multipart.FileHeader, ip string, bucket string, name string) (string, error) {
+func UploadToBucket(src io.Reader, ip string, bucket string, name string) (string, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 	db := GetDB()
@@ -151,7 +154,7 @@ func UploadToBucket(file *multipart.FileHeader, ip string, bucket string, name s
 	}
 
 	// Upload file to disk
-	dst, node, err := saveToDisk(file, ip)
+	dst, node, err := saveToDisk(src, name, ip)
 	if err != nil {
 		return "", err
 	}

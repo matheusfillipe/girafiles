@@ -15,6 +15,7 @@ import (
 )
 
 const DUP_ENTRY_ERROR = "UNIQUE constraint failed: files.filename"
+const DUP_ALIAS_ERROR = "UNIQUE constraint failed: files.bucket, files.alias"
 
 func openDatabase() *sql.DB {
 	settings := GetSettings()
@@ -125,11 +126,11 @@ func (db *DBHelper) insertNode(node *Node) error {
 
 func (db *DBHelper) insertAlias(bucket string, alias string, node *Node) error {
 	// First check if the alias is already in use
-	rows := db.QueryRow("SELECT filename FROM files WHERE bucket = ? AND alias = ? LIMIT 1", bucket, alias)
+	rows := db.QueryRow("SELECT filename FROM files WHERE bucket = ? AND alias = ?", bucket, alias)
 	var filename string
 	err := rows.Scan(&filename)
 	if err == nil {
-		return errors.New(DUP_ENTRY_ERROR)
+		return errors.New(DUP_ALIAS_ERROR)
 	} else if err != sql.ErrNoRows {
 		return err
 	}
@@ -138,7 +139,7 @@ func (db *DBHelper) insertAlias(bucket string, alias string, node *Node) error {
 	fileCount := 0
 	rows = db.QueryRow("SELECT count(*) FROM files WHERE filename = ?", node.name)
 	err = rows.Scan(&fileCount)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 
@@ -157,7 +158,7 @@ func (db *DBHelper) insertAlias(bucket string, alias string, node *Node) error {
 		return err
 	}
 	node.shortname = IdxToString(idx) + node.extension
-	return err
+	return nil
 }
 
 func (db *DBHelper) checkShortName(name string) (string, error) {
@@ -181,6 +182,7 @@ func (db *DBHelper) getShortnameForFilename(filename string) (string, error) {
 	var dbFilename string
 	row := db.QueryRow("SELECT id, filename FROM files WHERE filename = ?", filename)
 	if err := row.Scan(&idx, &dbFilename); err != nil {
+		slog.Debug(fmt.Sprintf("Failed to get shortname for filename %s", filename))
 		return "", err
 	}
 	shortname := IdxToString(idx)
