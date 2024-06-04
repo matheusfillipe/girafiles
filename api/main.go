@@ -125,6 +125,12 @@ func StartServer() {
 	router.RemoveExtraSlash = true
 	router.LoadHTMLGlob("web/templates/*")
 	router.Static("/static", "web/static")
+	if settings.TrustedProxyIP != "" {
+		if err := router.SetTrustedProxies([]string{settings.TrustedProxyIP}); err != nil {
+			panic(err)
+		}
+		router.TrustedPlatform = "X-Forwarded-For"
+	}
 
 	api := router.Group("/api")
 	files := router.Group("/")

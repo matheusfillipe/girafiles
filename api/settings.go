@@ -38,24 +38,31 @@ type Settings struct {
 	IPHourRateLimit int
 	// IP Rate Limit per day. 0 to disable
 	IPDayRateLimit int
+	// Trusted Proxy IP. If behind a proxy, set the proxy IP here. X-Forwarded-For header will be used
+	// to get the real client IP
+	TrustedProxyIP string
+	// The following IPs will be excluded from rate limiting. Format: ip1,ip2
+	RateLimitExcludedIPs []string
 }
 
 var singleInstance *Settings
 
 func getDefaultSettings() *Settings {
 	return &Settings{
-		AppName:             "GiraFiles",
-		Host:                "0.0.0.0",
-		Port:                "8000",
-		Debug:               false,
-		StorePath:           DEFAULT_STORE_PATH,
-		FilePersistanceTime: 0,
-		FileSizeLimit:       100,
-		StorePathSizeLimit:  2048,
-		Users:               map[string]string{},
-		IPMinRateLimit:      0,
-		IPHourRateLimit:     0,
-		IPDayRateLimit:      0,
+		AppName:              "GiraFiles",
+		Host:                 "0.0.0.0",
+		Port:                 "8000",
+		Debug:                false,
+		StorePath:            DEFAULT_STORE_PATH,
+		FilePersistanceTime:  0,
+		FileSizeLimit:        100,
+		StorePathSizeLimit:   2048,
+		Users:                map[string]string{},
+		IPMinRateLimit:       0,
+		IPHourRateLimit:      0,
+		IPDayRateLimit:       0,
+		TrustedProxyIP:       "",
+		RateLimitExcludedIPs: []string{},
 	}
 }
 
@@ -119,18 +126,20 @@ func newSettings() *Settings {
 	}
 
 	settings = &Settings{
-		AppName:             getEnv("APP_NAME", settings.AppName),
-		Host:                getEnv("HOST", settings.Host),
-		Port:                getEnv("PORT", settings.Port),
-		Debug:               getIntEnv("DEBUG", 0) == 1,
-		StorePath:           getEnv("STORE_PATH", settings.StorePath),
-		FilePersistanceTime: getIntEnv("FILE_PERSISTANCE_TIME", settings.FilePersistanceTime),
-		FileSizeLimit:       getIntEnv("FILE_SIZE_LIMIT", settings.FileSizeLimit),
-		StorePathSizeLimit:  getIntEnv("STORE_PATH_SIZE_LIMIT", settings.StorePathSizeLimit),
-		Users:               parseAuthUsers(getEnv("USERS", "")),
-		IPMinRateLimit:      getIntEnv("IP_MIN_RATE_LIMIT", settings.IPMinRateLimit),
-		IPHourRateLimit:     getIntEnv("IP_HOUR_RATE_LIMIT", settings.IPHourRateLimit),
-		IPDayRateLimit:      getIntEnv("IP_DAY_RATE_LIMIT", settings.IPDayRateLimit),
+		AppName:              getEnv("APP_NAME", settings.AppName),
+		Host:                 getEnv("HOST", settings.Host),
+		Port:                 getEnv("PORT", settings.Port),
+		Debug:                getIntEnv("DEBUG", 0) == 1,
+		StorePath:            getEnv("STORE_PATH", settings.StorePath),
+		FilePersistanceTime:  getIntEnv("FILE_PERSISTANCE_TIME", settings.FilePersistanceTime),
+		FileSizeLimit:        getIntEnv("FILE_SIZE_LIMIT", settings.FileSizeLimit),
+		StorePathSizeLimit:   getIntEnv("STORE_PATH_SIZE_LIMIT", settings.StorePathSizeLimit),
+		Users:                parseAuthUsers(getEnv("USERS", "")),
+		IPMinRateLimit:       getIntEnv("IP_MIN_RATE_LIMIT", settings.IPMinRateLimit),
+		IPHourRateLimit:      getIntEnv("IP_HOUR_RATE_LIMIT", settings.IPHourRateLimit),
+		IPDayRateLimit:       getIntEnv("IP_DAY_RATE_LIMIT", settings.IPDayRateLimit),
+		TrustedProxyIP:       getEnv("TRUSTED_PROXY_IP", settings.TrustedProxyIP),
+		RateLimitExcludedIPs: strings.Split(getEnv("RATE_LIMIT_EXCLUDED_IPS", ""), ","),
 	}
 
 	// mkdir -p STORE_PATH

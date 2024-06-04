@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -95,6 +96,9 @@ func (db *DBHelper) getHitCounts(origin string) HitCounts {
 
 func (db *DBHelper) CheckRateLimit(ip string) error {
 	settings := GetSettings()
+	if slices.Contains(settings.RateLimitExcludedIPs, ip) {
+		return nil
+	}
 	hits := db.getHitCounts(ip)
 
 	if settings.IPMinRateLimit > 0 && hits.minute >= settings.IPMinRateLimit {
