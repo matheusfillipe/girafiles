@@ -64,17 +64,19 @@ func (fb FileBucket) GetName() string {
 	return fb.Name
 }
 
-func handleUpload(c *gin.Context, filename string, err error, params url.Values, files *gin.RouterGroup) {
+func handleUpload(c *gin.Context, filename string, err error, params url.Values) {
+	url := fmt.Sprintf("%s/%s", getHostUrl(c.Request), filename)
 	if err != nil {
 		if err.Error() == DUP_ENTRY_ERROR {
 			if params.Get("redirect") == "true" {
-				c.Redirect(http.StatusFound, filename)
+				slog.Debug(fmt.Sprintf("Redirecting to %s", url))
+				c.Redirect(http.StatusFound, url)
 				return
 			}
 			c.JSON(http.StatusOK, gin.H{
 				"status":  "success",
 				"message": "File already exists",
-				"url":     fmt.Sprintf("%s/%s", getHostUrl(c.Request), filename),
+				"url":     url,
 			})
 			return
 		}
@@ -83,13 +85,14 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 	}
 
 	if params.Get("redirect") == "true" {
-		c.Redirect(http.StatusFound, filename)
+		slog.Debug(fmt.Sprintf("Redirecting to %s", url))
+		c.Redirect(http.StatusFound, url)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"url":    fmt.Sprintf("%s/%s", getHostUrl(c.Request), filename),
+		"url":    url,
 	})
 }
 
@@ -155,7 +158,7 @@ func StartServer() {
 
 		params := c.Request.URL.Query()
 		n, err := Upload(file, c.ClientIP())
-		handleUpload(c, n, err, params, files)
+		handleUpload(c, n, err, params)
 	})
 
 	api.PUT("/:name/:alias", func(c *gin.Context) {
@@ -175,7 +178,7 @@ func StartServer() {
 		reader := c.Request.Body
 		params := c.Request.URL.Query()
 		n, err := UploadToBucket(reader, c.ClientIP(), fb.Bucket, fb.Name)
-		handleUpload(c, n, err, params, files)
+		handleUpload(c, n, err, params)
 	})
 
 	files.GET("/:name", func(c *gin.Context) {
