@@ -24,7 +24,7 @@ func TestAuthentication(t *testing.T) {
 	t.Log("Running tests on", baseUrl)
 
 	// Upload file without authentication
-	jerr := uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), true, nil)
+	jerr := uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), true, nil)
 	if _, ok := jerr["error"]; !ok {
 		t.Fatalf("Expected authentication error to exist. Response was: %v", jerr)
 	}
@@ -34,7 +34,7 @@ func TestAuthentication(t *testing.T) {
 
 	// Upload file with wrong authentication
 	headers := map[string]string{"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte("user1:wrongpass"))}
-	jerr = uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), true, headers)
+	jerr = uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), true, headers)
 	if _, ok := jerr["error"]; !ok {
 		t.Fatalf("Expected authentication error to exist. Response was: %v", jerr)
 	}
@@ -44,14 +44,14 @@ func TestAuthentication(t *testing.T) {
 
 	// Upload file with correct authentication
 	headers = map[string]string{"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte("user1:pass1"))}
-	j := uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), false, headers)
+	j := uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), false, headers)
 	if _, ok := j["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
 	}
 
 	// Upload with second user
 	headers = map[string]string{"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte("user2:pass2"))}
-	j = uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), false, headers)
+	j = uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), false, headers)
 	if _, ok := j["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
 	}

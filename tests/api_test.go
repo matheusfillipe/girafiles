@@ -25,13 +25,13 @@ func TestApi(t *testing.T) {
 	t.Log("Running tests on", baseUrl)
 
 	// File too large
-	jerr := uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*11), true, nil)
+	jerr := uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*11), true, nil)
 	if _, ok := jerr["error"]; !ok {
 		t.Fatalf("Expected size limit error to exist. Response was: %v", jerr)
 	}
 
 	// File we keep track of
-	first := uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), false, nil)
+	first := uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), false, nil)
 	if _, ok := first["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", first)
 	}
@@ -42,7 +42,7 @@ func TestApi(t *testing.T) {
 		// Upload random file
 		file := randomJpegBytes(1024 * 1024 * 9)
 		fileBytes := &bytes.Buffer{}
-		j := uploadFile(t, baseUrl+"/api/files/", io.TeeReader(file, fileBytes), false, nil)
+		j := uploadFile(t, baseUrl+"/api/", io.TeeReader(file, fileBytes), false, nil)
 		if _, ok := j["url"]; !ok {
 			t.Fatalf("Expected url to exist. Response was: %v", j)
 		}
@@ -60,7 +60,7 @@ func TestApi(t *testing.T) {
 	}
 
 	// Upload file after minute rate limit
-	jerr = uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), true, nil)
+	jerr = uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), true, nil)
 	if _, ok := jerr["error"]; !ok {
 		t.Fatalf("Expected rate limit error to exist. Response was: %v", jerr)
 	}
@@ -75,7 +75,7 @@ func TestApi(t *testing.T) {
 		// Upload random file
 		file := randomJpegBytes(1024 * 1024 * 9)
 		fileBytes := &bytes.Buffer{}
-		j := uploadFile(t, baseUrl+"/api/files/", io.TeeReader(file, fileBytes), true, nil)
+		j := uploadFile(t, baseUrl+"/api/", io.TeeReader(file, fileBytes), true, nil)
 		if _, ok := j["url"]; !ok {
 			dumpDatabase(t, apiContainer)
 			t.Fatalf("Expected url to exist. Response was: %v", j)
@@ -94,7 +94,7 @@ func TestApi(t *testing.T) {
 	}
 
 	// Hour rate limit.
-	jerr = uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), true, nil)
+	jerr = uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), true, nil)
 	if _, ok := jerr["error"]; !ok {
 		dumpContainerLogs(t, apiContainer)
 		t.Fatalf("Expected rate limit error to exist. Response was: %v", jerr)
@@ -110,7 +110,7 @@ func TestApi(t *testing.T) {
 		// Upload random file
 		file := randomJpegBytes(1024 * 1024 * 9)
 		fileBytes := &bytes.Buffer{}
-		j := uploadFile(t, baseUrl+"/api/files/", io.TeeReader(file, fileBytes), true, nil)
+		j := uploadFile(t, baseUrl+"/api/", io.TeeReader(file, fileBytes), true, nil)
 		if _, ok := j["url"]; !ok {
 			dumpDatabase(t, apiContainer)
 			t.Fatalf("Expected url to exist. Response was: %v", j)
@@ -155,7 +155,7 @@ func TestStorageLimit(t *testing.T) {
 	t.Log("Running tests on", baseUrl)
 
 	// Upload file
-	j := uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), false, nil)
+	j := uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), false, nil)
 	firstUrl := j["url"]
 	if _, ok := j["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
@@ -168,7 +168,7 @@ func TestStorageLimit(t *testing.T) {
 
 	// Upload file
 	// Here the first should be deleted
-	j = uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), false, nil)
+	j = uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), false, nil)
 	if _, ok := j["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
 	}

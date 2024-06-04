@@ -22,7 +22,7 @@ func TestRegression(t *testing.T) {
 	t.Log("Running tests on", baseUrl)
 
 	// Upload file
-	j := uploadFile(t, baseUrl+"/api/files/", randomJpegBytes(1024*1024*9), false, nil)
+	j := uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), false, nil)
 	firstUrl := j["url"]
 	if _, ok := j["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
@@ -39,7 +39,7 @@ func TestRegression(t *testing.T) {
 	if _, err = io.Copy(dupBuf, dupFile); err != nil {
 		t.Fatal(err)
 	}
-	j = uploadFile(t, baseUrl+"/api/files/", bytes.NewReader(dupBuf.Bytes()), false, nil)
+	j = uploadFile(t, baseUrl+"/api/", bytes.NewReader(dupBuf.Bytes()), false, nil)
 	if _, ok := j["url"]; !ok {
 		t.Fatalf("Expected url to exist. Response was: %v", j)
 	}
@@ -61,7 +61,7 @@ func TestRegression(t *testing.T) {
 	}
 
 	// Duplicates should not be renewed
-	j = uploadFile(t, baseUrl+"/api/files/", bytes.NewReader(dupBuf.Bytes()), false, nil)
+	j = uploadFile(t, baseUrl+"/api/", bytes.NewReader(dupBuf.Bytes()), false, nil)
 	if _, ok := j["url"]; !ok {
 		dumpContainerLogs(t, apiContainer)
 		t.Fatalf("Expected url to exist. Response was: %v", j)

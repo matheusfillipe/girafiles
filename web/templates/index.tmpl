@@ -58,7 +58,7 @@
           "
         ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
         ondragleave="document.querySelector('.upload-box').classList.remove('dragover')">
-        <form action="/api/files/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
+        <form action="/api/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
           <label for="file-upload">Click or drop a file here to upload</label>
           <input type="file" id="file-upload" name="file"
             onchange="document.getElementById('file-upload-form').submit()">

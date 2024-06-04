@@ -68,7 +68,7 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 	if err != nil {
 		if err.Error() == DUP_ENTRY_ERROR {
 			if params.Get("redirect") == "true" {
-				c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s/", files.BasePath(), filename))
+				c.Redirect(http.StatusFound, fmt.Sprintf("/%s/%s", files.BasePath(), filename))
 				return
 			}
 			c.JSON(http.StatusOK, gin.H{
@@ -83,7 +83,7 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 	}
 
 	if params.Get("redirect") == "true" {
-		c.Redirect(http.StatusFound, fmt.Sprintf("%s/%s", files.BasePath(), filename))
+		c.Redirect(http.StatusFound, fmt.Sprintf("/%s/%s", files.BasePath(), filename))
 		return
 	}
 
@@ -124,8 +124,7 @@ func StartServer() {
 	router.Static("/static", "web/static")
 
 	api := router.Group("/api")
-	web := router.Group("/")
-	files := router.Group("/files")
+	files := router.Group("/")
 
 	router.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
@@ -147,7 +146,7 @@ func StartServer() {
 		}()
 	})
 
-	api.POST("/files", func(c *gin.Context) {
+	api.POST("/", func(c *gin.Context) {
 		file, err := c.FormFile("file")
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -159,7 +158,7 @@ func StartServer() {
 		handleUpload(c, n, err, params, files)
 	})
 
-	api.PUT("files/:name/:alias", func(c *gin.Context) {
+	api.PUT("/:name/:alias", func(c *gin.Context) {
 		var fb FileBucket
 		if err := c.ShouldBindUri(&fb); err != nil {
 			slog.Error(fmt.Sprintf("Failed to upload file: %s", err.Error()))
@@ -199,7 +198,7 @@ func StartServer() {
 		deliverFile(c, err, fb, m, cn)
 	})
 
-	web.GET("/", func(c *gin.Context) {
+	files.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"title":        settings.AppName,
 			"filesize":     formatIntUnlimitedIf0(settings.FileSizeLimit),
@@ -207,7 +206,7 @@ func StartServer() {
 			"ratelimit":    formatIntUnlimitedIf0(settings.IPDayRateLimit),
 			"storeLimit":   settings.IsStorePathSizeLimitEnabled(),
 			"authRequired": settings.IsAuthEnabled(),
-			"uploadEP":     getHostUrl(c.Request) + api.BasePath() + "/files/",
+			"uploadEP":     getHostUrl(c.Request) + api.BasePath() + "/",
 		})
 	})
 

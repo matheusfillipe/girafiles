@@ -16,11 +16,11 @@ Everything is stored in local disk. No database is used. No fancy things, just f
 - Limited Customization
 
 ## API
-- `POST /api/files/` - Upload a file. Response looks like:
+- `POST /api/` - Upload a file. Response looks like:
     ```json
     {
         "status": "success",
-        "url": "http://localhost:8000/files/ufa.png"
+        "url": "http://localhost:8000/ufa.png"
     }
     ```
     Or
@@ -37,7 +37,7 @@ Everything is stored in local disk. No database is used. No fancy things, just f
         "message": "Hourly rate limit exceeded"
     }
     ```
-- `GET /files/ufa.png` - Download a file
+- `GET /ufa.png` - Download or preview a file
 
 ## Usage
 You can clone this repository and run it with:
