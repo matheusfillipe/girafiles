@@ -68,13 +68,13 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 	if err != nil {
 		if err.Error() == DUP_ENTRY_ERROR {
 			if params.Get("redirect") == "true" {
-				c.Redirect(http.StatusFound, fmt.Sprintf("/%s/%s", files.BasePath(), filename))
+				c.Redirect(http.StatusFound, filename)
 				return
 			}
 			c.JSON(http.StatusOK, gin.H{
 				"status":  "success",
 				"message": "File already exists",
-				"url":     fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), filename),
+				"url":     fmt.Sprintf("%s/%s", getHostUrl(c.Request), filename),
 			})
 			return
 		}
@@ -83,13 +83,13 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 	}
 
 	if params.Get("redirect") == "true" {
-		c.Redirect(http.StatusFound, fmt.Sprintf("/%s/%s", files.BasePath(), filename))
+		c.Redirect(http.StatusFound, filename)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"url":    fmt.Sprintf("%s/%s", getHostUrl(c.Request)+files.BasePath(), filename),
+		"url":    fmt.Sprintf("%s/%s", getHostUrl(c.Request), filename),
 	})
 }
 
