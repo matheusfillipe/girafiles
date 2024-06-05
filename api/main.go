@@ -129,7 +129,9 @@ func StartServer() {
 		if err := router.SetTrustedProxies([]string{settings.TrustedProxyIP}); err != nil {
 			panic(err)
 		}
-		router.TrustedPlatform = "X-Forwarded-For"
+		router.RemoteIPHeaders = []string{"X-Forwarded-For", "X-Real-Ip"}
+		router.TrustedPlatform = settings.TrustedProxyIP
+		router.ForwardedByClientIP = true
 	}
 
 	api := router.Group("/api")
@@ -145,6 +147,8 @@ func StartServer() {
 	})
 
 	api.Use(func(c *gin.Context) {
+		// Log the request headers
+		fmt.Printf("Request Headers: %v", c.Request.Header)
 		if settings.IsAuthEnabled() {
 			checkAuth(c)
 		}
