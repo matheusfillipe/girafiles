@@ -103,7 +103,7 @@ func handleDbUploadErr(err error, dst string, node *Node) (string, error) {
 	if err.Error() == DUP_ENTRY_ERROR {
 		shortname, errdb := db.getShortnameForFilename(node.name)
 		if errdb != nil {
-			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
+			return "", fmt.Errorf("Failed to get filename! %s", errdb.Error())
 		}
 		return shortname, err
 	}
