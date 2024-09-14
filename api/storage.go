@@ -31,10 +31,9 @@ type Node struct {
 }
 
 type fileResponse struct {
-	name      string
-	mimetype  string
-	content   []byte
-	timestamp int64
+	name     string
+	mimetype string
+	content  []byte
 }
 
 func getFileHash(reader io.Reader) (string, error) {
