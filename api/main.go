@@ -96,7 +96,7 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values)
 	})
 }
 
-func deliverFile(c *gin.Context, err error, f FileParams, m string, cn []byte) {
+func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
 	if err != nil {
 		if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
 			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
@@ -106,12 +106,12 @@ func deliverFile(c *gin.Context, err error, f FileParams, m string, cn []byte) {
 	}
 	// If mime type is supported to be displayed in the browser, display it.
 	// otherwise, download it.
-	if isSupportedMimetype(m) {
-		c.Data(http.StatusOK, m, cn)
+	if isSupportedMimetype(file.mimetype) && !download {
+		c.Data(http.StatusOK, file.mimetype, file.content)
 		return
 	}
-	c.Header("Content-Disposition", "attachment; filename="+f.GetName())
-	c.Data(http.StatusOK, m, cn)
+	c.Header("Content-Disposition", "attachment; filename="+file.name)
+	c.Data(http.StatusOK, file.mimetype, file.content)
 }
 
 func StartServer() {
@@ -197,8 +197,37 @@ func StartServer() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err})
 			return
 		}
-		m, cn, err := Download(f.Name)
-		deliverFile(c, err, f, m, cn)
+		file, err := Download(f.Name)
+		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
+	})
+
+	files.GET("/:name/pretty", func(c *gin.Context) {
+		var f File
+		if err := c.ShouldBindUri(&f); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err})
+			return
+		}
+		file, err := Download(f.Name)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		params := c.Request.URL.Query()
+		lang := ""
+		for _, param := range []string{"language", "lang", "l"} {
+			_lang := params.Get(param)
+			if isSupportedLanguage(_lang) {
+				lang = "language-" + _lang
+				break
+			}
+		}
+		c.HTML(http.StatusOK, "paste.tmpl", gin.H{
+			"title":          settings.AppName,
+			"filename":       file.name,
+			"class":          lang,
+			"code":           string(file.content),
+			"pasteLanguages": LANGUAGE_NAMES_MAP,
+		})
 	})
 
 	files.GET("/:name/:alias", func(c *gin.Context) {
@@ -207,19 +236,20 @@ func StartServer() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err})
 			return
 		}
-		m, cn, err := DownloadFromBucket(fb.Bucket, fb.Name)
-		deliverFile(c, err, fb, m, cn)
+		file, err := DownloadFromBucket(fb.Bucket, fb.Name)
+		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
 	})
 
 	files.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
-			"title":        settings.AppName,
-			"filesize":     formatIntUnlimitedIf0(settings.FileSizeLimit),
-			"persistance":  formatIntUnlimitedIf0(settings.FilePersistanceTime),
-			"ratelimit":    formatIntUnlimitedIf0(settings.IPDayRateLimit),
-			"storeLimit":   settings.IsStorePathSizeLimitEnabled(),
-			"authRequired": settings.IsAuthEnabled(),
-			"uploadEP":     getHostUrl(c.Request) + api.BasePath() + "/",
+			"title":          settings.AppName,
+			"filesize":       formatIntUnlimitedIf0(settings.FileSizeLimit),
+			"persistance":    formatIntUnlimitedIf0(settings.FilePersistanceTime),
+			"ratelimit":      formatIntUnlimitedIf0(settings.IPDayRateLimit),
+			"storeLimit":     settings.IsStorePathSizeLimitEnabled(),
+			"authRequired":   settings.IsAuthEnabled(),
+			"uploadEP":       getHostUrl(c.Request) + api.BasePath() + "/",
+			"pasteLanguages": LANGUAGE_NAMES_MAP,
 		})
 	})
 

@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
+  <!-- Include Select2 CSS and JS -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 </head>
 
 <body>
@@ -49,14 +53,12 @@
     <p>Only API uploads are accepted</p>
     {{ else}}
     <div class="upload-container">
-      <div class="upload-box"
-        ondrop="
+      <div class="upload-box" ondrop="
           event.preventDefault();
           document.getElementById('file-upload').files = event.dataTransfer.files;
           document.getElementById('file-upload-form').submit()
           document.querySelector('.upload-box').classList.remove('dragover')
-          "
-        ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
+          " ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
         ondragleave="document.querySelector('.upload-box').classList.remove('dragover')">
         <form action="/api/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
           <label for="file-upload">Click or drop a file here to upload</label>
@@ -64,6 +66,23 @@
             onchange="document.getElementById('file-upload-form').submit()">
         </form>
       </div>
+    </div>
+    <div class="pastebin">
+      <h1>Create a Paste</h1>
+
+      <div class="language-picker">
+        <label for="language">Select Language:</label>
+        <select id="language" value="plaintext">
+          {{ range $name, $val := .pasteLanguages }}
+          <option value="{{ $val }}" {{ if eq $val "" }}selected{{ end }}>{{ $name }}</option>
+          {{ end }}
+        </select>
+      </div>
+      <!-- Code Textarea -->
+      <textarea id="code-input" placeholder="Paste your code here..."></textarea>
+
+      <!-- Send Button -->
+      <button onclick="submitPaste()">Send</button>
     </div>
     {{ end}}
 
@@ -73,11 +92,29 @@
 
     <script src="https://kit.fontawesome.com/a076d05399.js"></script>
     <script>
-      function copyCode() {
-        const code = document.querySelector('pre code').innerText;
-        navigator.clipboard.writeText(code);
+      $(document).ready(function () {
+        $('#language').select2();
+        $('#language').one('select2:open', function (e) {
+          $('input.select2-search__field').prop('placeholder', 'Choose a language');
+        });
+      });
+      function submitPaste() {
+        // Get the code and selected language
+        const code = document.getElementById('code-input').value;
+        const language = document.getElementById('language').value;
+
+        // Submit as a form with file contents to the API
+        var form = new FormData();
+        form.append('file', new Blob([code], {type: 'text/plain'}), 'file');
+        fetch('/api/', {
+          method: 'POST',
+          body: form,
+        }).then((res) => res.json()).then((data) => {
+          window.location.href = `${data.url}/pretty?l=${language}`;
+        });
       }
     </script>
+    <script src="/static/shared.js"></script>
 </body>
 
 </html>

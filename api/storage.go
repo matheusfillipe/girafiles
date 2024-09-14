@@ -30,6 +30,13 @@ type Node struct {
 	reader    io.Reader
 }
 
+type fileResponse struct {
+	name      string
+	mimetype  string
+	content   []byte
+	timestamp int64
+}
+
 func getFileHash(reader io.Reader) (string, error) {
 	md5Hash := md5.New()
 	_, err := io.Copy(md5Hash, reader)
@@ -103,7 +110,7 @@ func handleDbUploadErr(err error, dst string, node *Node) (string, error) {
 	if err.Error() == DUP_ENTRY_ERROR {
 		shortname, errdb := db.getShortnameForFilename(node.name)
 		if errdb != nil {
-			return "", fmt.Errorf("Failed to get filename! " + errdb.Error())
+			return "", fmt.Errorf("Failed to get filename! %s", errdb.Error())
 		}
 		return shortname, err
 	}
@@ -168,7 +175,7 @@ func UploadToBucket(src io.Reader, ip string, bucket string, name string) (strin
 	return node.shortname, err
 }
 
-func loadFromDisk(name string) (string, []byte, error) {
+func loadFromDisk(name string) (fileResponse, error) {
 	settings := GetSettings()
 
 	name = strings.SplitN(name, "@", 2)[0]
@@ -178,34 +185,38 @@ func loadFromDisk(name string) (string, []byte, error) {
 
 	if err != nil {
 		log.Println(err)
-		return "", nil, err
+		return fileResponse{}, err
 	}
 	m := mimetype.Detect(b).String()
 
-	return m, b, nil
+	return fileResponse{
+		name:     name,
+		mimetype: m,
+		content:  b,
+	}, nil
 }
 
-func Download(n string) (string, []byte, error) {
+func Download(n string) (fileResponse, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 
 	name, err := GetDB().checkShortName(n)
 	if err != nil {
 		log.Println(err)
-		return "", nil, err
+		return fileResponse{}, err
 	}
 
 	return loadFromDisk(name)
 }
 
-func DownloadFromBucket(bucket string, alias string) (string, []byte, error) {
+func DownloadFromBucket(bucket string, alias string) (fileResponse, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 
 	name, err := GetDB().checkAlias(bucket, alias)
 	if err != nil {
 		log.Println(err)
-		return "", nil, err
+		return fileResponse{}, err
 	}
 	return loadFromDisk(name)
 }
