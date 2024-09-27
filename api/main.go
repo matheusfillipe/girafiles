@@ -12,6 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	CONTENT_TYPE_JSON = "application/json"
+	CONTENT_TYPE_TEXT = "text/plain"
+)
+
 func formatIntUnlimitedIf0(number int) string {
 	if number == 0 {
 		return "unlimited"
@@ -64,7 +69,7 @@ func (fb FileBucket) GetName() string {
 	return fb.Name
 }
 
-func handleUpload(c *gin.Context, filename string, err error, params url.Values) {
+func handleUpload(c *gin.Context, filename string, err error, params url.Values, contentType string) {
 	url := fmt.Sprintf("%s/%s", getHostUrl(c.Request), filename)
 	if err != nil {
 		if err.Error() == DUP_ENTRY_ERROR {
@@ -73,11 +78,15 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values)
 				c.Redirect(http.StatusFound, url)
 				return
 			}
-			c.JSON(http.StatusOK, gin.H{
-				"status":  "success",
-				"message": "File already exists",
-				"url":     url,
-			})
+			if contentType == CONTENT_TYPE_JSON {
+				c.JSON(http.StatusOK, gin.H{
+					"status":  "success",
+					"message": "File already exists",
+					"url":     url,
+				})
+			} else {
+				c.String(http.StatusOK, "File already exists: %s", url)
+			}
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -90,10 +99,14 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"url":    url,
-	})
+	if contentType == CONTENT_TYPE_JSON {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "success",
+			"url":    url,
+		})
+	} else {
+		c.String(http.StatusOK, url)
+	}
 }
 
 func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
@@ -113,7 +126,19 @@ func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
 	c.Header("Content-Disposition", "attachment; filename="+file.name)
 	c.Data(http.StatusOK, file.mimetype, file.content)
 }
+func postFile(contentType string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
+		params := c.Request.URL.Query()
+		n, err := Upload(file, c.ClientIP())
+		handleUpload(c, n, err, params, contentType)
+	}
+}
 func StartServer() {
 	var settings = GetSettings()
 
@@ -159,17 +184,8 @@ func StartServer() {
 		}()
 	})
 
-	api.POST("/", func(c *gin.Context) {
-		file, err := c.FormFile("file")
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		params := c.Request.URL.Query()
-		n, err := Upload(file, c.ClientIP())
-		handleUpload(c, n, err, params)
-	})
+	api.POST("/", postFile(CONTENT_TYPE_JSON))
+	router.POST("/", postFile(CONTENT_TYPE_TEXT))
 
 	api.PUT("/:name/:alias", func(c *gin.Context) {
 		var fb FileBucket
@@ -188,7 +204,7 @@ func StartServer() {
 		reader := c.Request.Body
 		params := c.Request.URL.Query()
 		n, err := UploadToBucket(reader, c.ClientIP(), fb.Bucket, fb.Name)
-		handleUpload(c, n, err, params)
+		handleUpload(c, n, err, params, CONTENT_TYPE_JSON)
 	})
 
 	files.GET("/:name", func(c *gin.Context) {
@@ -248,7 +264,7 @@ func StartServer() {
 			"ratelimit":      formatIntUnlimitedIf0(settings.IPDayRateLimit),
 			"storeLimit":     settings.IsStorePathSizeLimitEnabled(),
 			"authRequired":   settings.IsAuthEnabled(),
-			"uploadEP":       getHostUrl(c.Request) + api.BasePath() + "/",
+			"uploadEP":       getHostUrl(c.Request),
 			"pasteLanguages": LANGUAGE_NAMES_MAP,
 		})
 	})
