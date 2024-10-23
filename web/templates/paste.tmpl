@@ -10,6 +10,7 @@
   </link>
   <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/highlightjs-copy/dist/highlightjs-copy.min.css" />
   <style>
     body {
       background-color: #444;
@@ -51,6 +52,10 @@
       margin-left: 10px;
     }
 
+    .hljs-ln td {
+      padding-right: 10px !important;
+    }
+
   </style>
 </head>
 
@@ -64,7 +69,6 @@
         onclick="window.location.href = `${window.location.href.replace(/\/[^\/]*$/, '')}/?download=true`;">Download</button>
       <div style="flex-grow: 10;">
       </div>
-      <button onclick="copyCode()">Copy</button>
     </div>
     <pre><code class="{{ .class }}">
 {{ .code }}
@@ -82,10 +86,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
   <script
     src="//cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.9.0/highlightjs-line-numbers.min.js"></script>
+  <script src="https://unpkg.com/highlightjs-copy/dist/highlightjs-copy.min.js"></script>
   <script src="/static/shared.js"></script>
   <script>
     hljs.highlightAll();
     hljs.initLineNumbersOnLoad();
+    hljs.addPlugin(new CopyButtonPlugin({autohide: false}));
   </script>
 </body>
 
