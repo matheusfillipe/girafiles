@@ -110,8 +110,8 @@
           method: 'POST',
           body: form,
         }).then((res) => res.json()).then((data) => {
-          const param = language ? `l=${language}` : '';
-          window.location.href = `${data.url}/pretty?${param}`;
+          const param = language ? `?l=${language}` : '';
+          window.location.href = `${data.url}/p${param}`;
         });
       }
     </script>

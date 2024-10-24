@@ -217,7 +217,7 @@ func StartServer() {
 		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
 	})
 
-	files.GET("/:name/pretty", func(c *gin.Context) {
+	files.GET("/:name/p", func(c *gin.Context) {
 		var f File
 		if err := c.ShouldBindUri(&f); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err})
