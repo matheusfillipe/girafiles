@@ -15,6 +15,13 @@ body {
   /* Height of the footer */
 }
 
+@media (max-width: 900px) {
+  .container {
+    max-width: 100%;
+    margin: 0 5px;
+  }
+}
+
 h1 {
   font-size: 24px;
 }
