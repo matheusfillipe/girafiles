@@ -1,9 +1,9 @@
-FROM golang:1.23
+FROM golang:1.23 as builder
 WORKDIR /app
 COPY . .
 RUN go mod download
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /docker-gs-ping
+RUN CGO_ENABLED=1 GOOS=linux go build -o build/girafiles .
 ARG TESTING
 RUN \
   if [ "$TESTING" = "true" ]; then \
@@ -13,4 +13,4 @@ RUN \
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["go", "run", "main.go"]
+CMD ["./build/girafiles"]
