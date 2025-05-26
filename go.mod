@@ -1,12 +1,13 @@
 module github.com/matheusfillipe/girafiles
 
-go 1.22
+go 1.23.0
+
 toolchain go1.24.1
 
 require (
 	github.com/docker/go-connections v0.5.0
 	github.com/gabriel-vasile/mimetype v1.4.8
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.10.1
 	github.com/joho/godotenv v1.5.1
 	github.com/jxskiss/base62 v1.1.0
 	github.com/mattn/go-sqlite3 v1.14.28
