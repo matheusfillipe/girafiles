@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
+	"github.com/gabriel-vasile/mimetype"
 	"io"
 	"log"
 	"log/slog"
@@ -13,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"github.com/gabriel-vasile/mimetype"
 )
 
 const FILEDIR = "data"
@@ -30,10 +30,10 @@ type Node struct {
 }
 
 type fileResponse struct {
-	name     string
+	name      string
 	shortname string
-	mimetype string
-	content  []byte
+	mimetype  string
+	content   []byte
 }
 
 func getFileHash(reader io.Reader) (string, error) {
@@ -189,10 +189,10 @@ func loadFromDisk(name string, shortname string) (fileResponse, error) {
 	m := mimetype.Detect(b).String()
 
 	return fileResponse{
-	  shortname: shortname,
-		name:     name,
-		mimetype: m,
-		content:  b,
+		shortname: shortname,
+		name:      name,
+		mimetype:  m,
+		content:   b,
 	}, nil
 }
 
@@ -206,7 +206,7 @@ func Download(n string) (fileResponse, error) {
 		return fileResponse{}, err
 	}
 
-	return loadFromDisk(name,n)
+	return loadFromDisk(name, n)
 }
 
 func DownloadFromBucket(bucket string, alias string) (fileResponse, error) {
@@ -218,7 +218,7 @@ func DownloadFromBucket(bucket string, alias string) (fileResponse, error) {
 		log.Println(err)
 		return fileResponse{}, err
 	}
-	return loadFromDisk(name,alias)
+	return loadFromDisk(name, alias)
 }
 
 func isStorageLimitExceeded() bool {
@@ -295,24 +295,24 @@ func cleanup() {
 }
 
 func humanReadableSize(size int) string {
-    if size < 1000 {
-        return fmt.Sprintf("%d B", size)
-    }
+	if size < 1000 {
+		return fmt.Sprintf("%d B", size)
+	}
 
-    // Define units
-    units := []string{"KB", "MB", "GB", "TB", "PB", "EB"}
+	// Define units
+	units := []string{"KB", "MB", "GB", "TB", "PB", "EB"}
 
-    // Calculate the index for units
-    sizeFloat := float64(size)
-    i := 0
+	// Calculate the index for units
+	sizeFloat := float64(size)
+	i := 0
 
-    // Determine the appropriate unit
-    for sizeFloat >= 1000 && i < len(units) {
-        sizeFloat /= 1000
-        i++
-    }
+	// Determine the appropriate unit
+	for sizeFloat >= 1000 && i < len(units) {
+		sizeFloat /= 1000
+		i++
+	}
 
-    // Round to two decimal places
-    sizeFloat = (sizeFloat*100 + 0.5) / 100 // This ensures proper rounding
-    return fmt.Sprintf("%.2f %s", sizeFloat, units[i-1])
+	// Round to two decimal places
+	sizeFloat = (sizeFloat*100 + 0.5) / 100 // This ensures proper rounding
+	return fmt.Sprintf("%.2f %s", sizeFloat, units[i-1])
 }
