@@ -122,9 +122,13 @@ func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
 	if isSupportedMimetype(file.mimetype) && !download {
 		c.Data(http.StatusOK, file.mimetype, file.content)
 		return
-	}
+	}else if(download == true){
 	c.Header("Content-Disposition", "attachment; filename="+file.name)
 	c.Data(http.StatusOK, file.mimetype, file.content)
+	}else{
+	//idx, _ := // get XXX
+	c.Redirect(308,fmt.Sprintf("/info/%s",file.shortname))
+	}
 }
 func postFile(contentType string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -139,6 +143,7 @@ func postFile(contentType string) gin.HandlerFunc {
 		handleUpload(c, n, err, params, contentType)
 	}
 }
+
 func StartServer() {
 	var settings = GetSettings()
 
@@ -206,7 +211,21 @@ func StartServer() {
 		n, err := UploadToBucket(reader, c.ClientIP(), fb.Bucket, fb.Name)
 		handleUpload(c, n, err, params, CONTENT_TYPE_JSON)
 	})
-
+  files.GET("/info/:name", func(c *gin.Context){
+  var f File
+if err := c.ShouldBindUri(&f); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err})
+			return
+		}
+		file, err := Download(f.Name)
+		if err != nil {
+c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
+		}
+  c.HTML(http.StatusOK,"info.tmpl", gin.H{
+    "title": settings.AppName,
+    "size": humanReadableSize(len(file.content)),
+  })
+  })
 	files.GET("/:name", func(c *gin.Context) {
 		var f File
 		if err := c.ShouldBindUri(&f); err != nil {

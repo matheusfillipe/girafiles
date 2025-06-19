@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File preview</title>
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.8.0/build/styles/github-dark.min.css">
+  </link>
+  <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    body {
+      background-color: #444;
+      color: #fff;
+      margin: 0 10%;
+    }
+
+
+    .container {
+      max-width: 100%;
+    }
+
+    @media (max-width: 900px) {
+      body {
+        margin: 0 5px;
+      }
+    }
+
+    h1 {
+      color: #f0f0f0;
+      text-align: center;
+    }
+
+    button {
+      background-color: #111;
+      color: #fff;
+      padding: 10px 20px;
+      border: medium;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .footer {
+      padding: 10px;
+      background-color: #222;
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+    }
+
+    .github-link {
+      color: #fff;
+      text-decoration: none;
+      margin-left: 10px;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="container" sytle="max-width: 100%;">
+    <h1>{{ .title }}</h1>
+    <h4>{{ .timestamp }}</h4>
+      <p>File size: {{ .size }}</p>
+      <div style="display: flex">
+      <button
+        onclick="window.location.href = `${window.location.href.replace(/(https?:\/\/[^\/]+)\/info\/(.*)/, '$1/$2?download=true')}`;">Download</button>
+      <div style="flex-grow: 10;">
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-bottom: 50px;">
+    <button onclick="window.location.href = '/';">Go Home</button>
+  </div>
+  <div class="footer">
+    <a href="https://github.com/matheusfillipe/girafiles" class="github-link"><i class="fab fa-github"></i> GitHub</a>
+  </div>
+  <script src="/static/shared.js"></script>
+</body>
+
+</html>
