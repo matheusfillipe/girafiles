@@ -126,7 +126,6 @@ func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
 		c.Header("Content-Disposition", "attachment; filename="+file.name)
 		c.Data(http.StatusOK, file.mimetype, file.content)
 	} else {
-		//idx, _ := // get XXX
 		c.Redirect(308, fmt.Sprintf("/info/%s", file.shortname))
 	}
 }
