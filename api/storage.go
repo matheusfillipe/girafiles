@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
-	"github.com/gabriel-vasile/mimetype"
 	"io"
 	"log"
 	"log/slog"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
 const FILEDIR = "data"

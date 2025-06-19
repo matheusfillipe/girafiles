@@ -122,7 +122,7 @@ func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
 	if isSupportedMimetype(file.mimetype) && !download {
 		c.Data(http.StatusOK, file.mimetype, file.content)
 		return
-	} else if download == true {
+	} else if download {
 		c.Header("Content-Disposition", "attachment; filename="+file.name)
 		c.Data(http.StatusOK, file.mimetype, file.content)
 	} else {
