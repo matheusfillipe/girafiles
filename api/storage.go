@@ -31,9 +31,10 @@ type Node struct {
 }
 
 type fileResponse struct {
-	name     string
-	mimetype string
-	content  []byte
+	name      string
+	shortname string
+	mimetype  string
+	content   []byte
 }
 
 func getFileHash(reader io.Reader) (string, error) {
@@ -174,7 +175,7 @@ func UploadToBucket(src io.Reader, ip string, bucket string, name string) (strin
 	return node.shortname, err
 }
 
-func loadFromDisk(name string) (fileResponse, error) {
+func loadFromDisk(name string, shortname string) (fileResponse, error) {
 	settings := GetSettings()
 
 	name = strings.SplitN(name, "@", 2)[0]
@@ -189,9 +190,10 @@ func loadFromDisk(name string) (fileResponse, error) {
 	m := mimetype.Detect(b).String()
 
 	return fileResponse{
-		name:     name,
-		mimetype: m,
-		content:  b,
+		shortname: shortname,
+		name:      name,
+		mimetype:  m,
+		content:   b,
 	}, nil
 }
 
@@ -205,7 +207,7 @@ func Download(n string) (fileResponse, error) {
 		return fileResponse{}, err
 	}
 
-	return loadFromDisk(name)
+	return loadFromDisk(name, n)
 }
 
 func DownloadFromBucket(bucket string, alias string) (fileResponse, error) {
@@ -217,7 +219,7 @@ func DownloadFromBucket(bucket string, alias string) (fileResponse, error) {
 		log.Println(err)
 		return fileResponse{}, err
 	}
-	return loadFromDisk(name)
+	return loadFromDisk(name, alias)
 }
 
 func isStorageLimitExceeded() bool {
@@ -291,4 +293,27 @@ func cleanup() {
 	} else {
 		slog.Debug("Storage limit not exceeded")
 	}
+}
+
+func humanReadableSize(size int) string {
+	if size < 1000 {
+		return fmt.Sprintf("%d B", size)
+	}
+
+	// Define units
+	units := []string{"KB", "MB", "GB", "TB", "PB", "EB"}
+
+	// Calculate the index for units
+	sizeFloat := float64(size)
+	i := 0
+
+	// Determine the appropriate unit
+	for sizeFloat >= 1000 && i < len(units) {
+		sizeFloat /= 1000
+		i++
+	}
+
+	// Round to two decimal places
+	sizeFloat = (sizeFloat*100 + 0.5) / 100 // This ensures proper rounding
+	return fmt.Sprintf("%.2f %s", sizeFloat, units[i-1])
 }

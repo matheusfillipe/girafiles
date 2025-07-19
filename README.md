@@ -1,6 +1,6 @@
 # GiraFiles
 [![Docker Pulls](https://img.shields.io/docker/pulls/mattfly/girafiles.svg)](https://hub.docker.com/repository/docker/mattfly/girafiles/general)
-[![Live at](https://img.shields.io/badge/Demo%20at-filebin.cloud.mattf.one-007ACC)](https://filebin.cloud.mattf.one/)
+[![Live at](https://img.shields.io/badge/Demo%20at-https://s.h4ks.com/-007ACC)](https://s.h4ks.com/)
 
 Darn minimal filebin with preview and API.
 
