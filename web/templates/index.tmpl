@@ -40,63 +40,76 @@
       {{ end }}
     </table>
 
-    <div class="code-container">
-      <h4 style="text-align: start;">Curl upload</h4>
-      <div class="code-line">
-        <pre
-          style="background-color: #111;"><code>curl -s -F "file=@/path/to/file" {{ .uploadEP }}</code></pre>
-        <button onclick="copyCode()">Copy</button>
-      </div>
-    </div>
-
     {{ if .authRequired}}
     <p>Only API uploads are accepted</p>
     {{ else}}
-    <div class="upload-container">
-      <div class="upload-box" ondrop="
-          event.preventDefault();
-          document.getElementById('file-upload').files = event.dataTransfer.files;
-          document.getElementById('file-upload-form').submit()
-          document.querySelector('.upload-box').classList.remove('dragover')
-          " ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
-        ondragleave="document.querySelector('.upload-box').classList.remove('dragover')">
-        <form action="/api/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
-          <label for="file-upload">Click or drop a file here to upload</label>
-          <input type="file" id="file-upload" name="file"
-            onchange="document.getElementById('file-upload-form').submit()">
-        </form>
-      </div>
-    </div>
-    <div class="pastebin">
-      <h1>Create a Paste</h1>
-
-      <div class="language-picker">
-        <label for="language">Select Language:</label>
-        <select id="language" value="plaintext">
-          {{ range $name, $val := .pasteLanguages }}
-          <option value="{{ $val }}" {{ if eq $val "" }}selected{{ end }}>{{ $name }}</option>
-          {{ end }}
-        </select>
-      </div>
-      <!-- Code Textarea -->
-      <textarea id="code-input" placeholder="Paste your code here..."></textarea>
-
-      <!-- Send Button -->
-      <button onclick="submitPaste()">Send</button>
-    </div>
-
-    <div class="voice-recorder">
-      <h1>Record Audio</h1>
-
-      <div class="recorder-controls">
-        <button id="record-btn" onclick="toggleRecording()">Start Recording</button>
-        <button id="stop-btn" onclick="stopRecording()" disabled>Stop</button>
-        <span id="recording-time">00:00</span>
+    <div class="tabs">
+      <div class="tab-buttons">
+        <button class="tab-button active" onclick="openTab(event, 'upload-tab')">File Upload</button>
+        <button class="tab-button" onclick="openTab(event, 'paste-tab')">Text Paste</button>
+        <button class="tab-button" onclick="openTab(event, 'audio-tab')">Audio Record</button>
       </div>
 
-      <audio id="audio-preview" controls style="display: none; width: 100%; margin-top: 10px;"></audio>
+      <div id="upload-tab" class="tab-content active">
+        <div class="code-container">
+          <h4 style="text-align: start;">Curl upload</h4>
+          <div class="code-line">
+            <pre style="background-color: #111;"><code>curl -s -F "file=@/path/to/file" {{ .uploadEP }}</code></pre>
+            <button onclick="copyCode()">Copy</button>
+          </div>
+        </div>
 
-      <button id="upload-audio-btn" onclick="uploadAudio()" style="display: none; margin-top: 10px;">Upload Audio</button>
+        <div class="upload-container">
+          <div class="upload-box" ondrop="
+              event.preventDefault();
+              document.getElementById('file-upload').files = event.dataTransfer.files;
+              document.getElementById('file-upload-form').submit()
+              document.querySelector('.upload-box').classList.remove('dragover')
+              " ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
+            ondragleave="document.querySelector('.upload-box').classList.remove('dragover')">
+            <form action="/api/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
+              <label for="file-upload">Click or drop a file here to upload</label>
+              <input type="file" id="file-upload" name="file"
+                onchange="document.getElementById('file-upload-form').submit()">
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div id="paste-tab" class="tab-content">
+        <div class="pastebin">
+          <h1>Create a Paste</h1>
+
+          <div class="language-picker">
+            <label for="language">Select Language:</label>
+            <select id="language" value="plaintext">
+              {{ range $name, $val := .pasteLanguages }}
+              <option value="{{ $val }}" {{ if eq $val "" }}selected{{ end }}>{{ $name }}</option>
+              {{ end }}
+            </select>
+          </div>
+          <textarea id="code-input" placeholder="Paste your code here..."></textarea>
+          <div class="pastebin-controls">
+            <button onclick="submitPaste()">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="audio-tab" class="tab-content">
+        <div class="voice-recorder">
+          <h1>Record Audio</h1>
+
+          <div class="recorder-controls">
+            <button id="record-btn" onclick="toggleRecording()">Start Recording</button>
+            <button id="stop-btn" onclick="stopRecording()" disabled>Stop</button>
+            <span id="recording-time">00:00</span>
+          </div>
+
+          <audio id="audio-preview" controls style="display: none; width: 100%; margin-top: 10px;"></audio>
+
+          <button id="upload-audio-btn" onclick="uploadAudio()" style="display: none; margin-top: 10px;">Upload Audio</button>
+        </div>
+      </div>
     </div>
     {{ end}}
 
@@ -114,8 +127,13 @@
       });
       function submitPaste() {
         // Get the code and selected language
-        const code = document.getElementById('code-input').value;
+        const code = document.getElementById('code-input').value.trim();
         const language = document.getElementById('language').value;
+
+        if (!code) {
+          alert('Please enter some text before sending');
+          return;
+        }
 
         // Submit as a form with file contents to the API
         var form = new FormData();
@@ -225,6 +243,22 @@
         }).catch((error) => {
           alert('Upload failed: ' + error.message);
         });
+      }
+
+      // Tab functionality
+      function openTab(evt, tabName) {
+        const tabcontent = document.getElementsByClassName('tab-content');
+        for (let i = 0; i < tabcontent.length; i++) {
+          tabcontent[i].classList.remove('active');
+        }
+
+        const tablinks = document.getElementsByClassName('tab-button');
+        for (let i = 0; i < tablinks.length; i++) {
+          tablinks[i].classList.remove('active');
+        }
+
+        document.getElementById(tabName).classList.add('active');
+        evt.currentTarget.classList.add('active');
       }
     </script>
     <script src="/static/shared.js"></script>
