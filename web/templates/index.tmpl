@@ -84,6 +84,20 @@
       <!-- Send Button -->
       <button onclick="submitPaste()">Send</button>
     </div>
+
+    <div class="voice-recorder">
+      <h1>Record Audio</h1>
+
+      <div class="recorder-controls">
+        <button id="record-btn" onclick="toggleRecording()">Start Recording</button>
+        <button id="stop-btn" onclick="stopRecording()" disabled>Stop</button>
+        <span id="recording-time">00:00</span>
+      </div>
+
+      <audio id="audio-preview" controls style="display: none; width: 100%; margin-top: 10px;"></audio>
+
+      <button id="upload-audio-btn" onclick="uploadAudio()" style="display: none; margin-top: 10px;">Upload Audio</button>
+    </div>
     {{ end}}
 
     <div class="footer">
@@ -112,6 +126,104 @@
         }).then((res) => res.json()).then((data) => {
           const param = language ? `?l=${language}` : '';
           window.location.href = `${data.url}/p${param}`;
+        });
+      }
+
+      // Audio recording functionality
+      let mediaRecorder;
+      let audioChunks = [];
+      let recordingStartTime;
+      let recordingInterval;
+      let currentAudioBlob;
+
+      function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      }
+
+      function updateRecordingTime() {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        document.getElementById('recording-time').textContent = formatTime(elapsed);
+      }
+
+      async function toggleRecording() {
+        const recordBtn = document.getElementById('record-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const audioPreview = document.getElementById('audio-preview');
+        const uploadBtn = document.getElementById('upload-audio-btn');
+
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = event => {
+              audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+              const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+              currentAudioBlob = audioBlob;
+              const audioUrl = URL.createObjectURL(audioBlob);
+
+              audioPreview.src = audioUrl;
+              audioPreview.style.display = 'block';
+              uploadBtn.style.display = 'inline-block';
+
+              // Stop all tracks to release microphone
+              stream.getTracks().forEach(track => track.stop());
+            };
+
+            recordingStartTime = Date.now();
+            recordingInterval = setInterval(updateRecordingTime, 1000);
+
+            mediaRecorder.start();
+            recordBtn.textContent = 'Recording...';
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
+            audioPreview.style.display = 'none';
+            uploadBtn.style.display = 'none';
+
+          } catch (err) {
+            alert('Error accessing microphone: ' + err.message);
+          }
+        }
+      }
+
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+          clearInterval(recordingInterval);
+
+          const recordBtn = document.getElementById('record-btn');
+          const stopBtn = document.getElementById('stop-btn');
+
+          recordBtn.textContent = 'Start Recording';
+          recordBtn.disabled = false;
+          stopBtn.disabled = true;
+        }
+      }
+
+      function uploadAudio() {
+        if (!currentAudioBlob) {
+          alert('No audio recorded');
+          return;
+        }
+
+        const form = new FormData();
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `recording-${timestamp}.wav`;
+        form.append('file', currentAudioBlob, filename);
+
+        fetch('/api/', {
+          method: 'POST',
+          body: form,
+        }).then((res) => res.json()).then((data) => {
+          window.location.href = data.url;
+        }).catch((error) => {
+          alert('Upload failed: ' + error.message);
         });
       }
     </script>
