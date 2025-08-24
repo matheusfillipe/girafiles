@@ -95,7 +95,11 @@ func saveToDisk(src io.Reader, filename string, ip string) (string, *Node, error
 	if err != nil {
 		return "", node, err
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); err != nil {
+			slog.Error("Failed to close file", "error", err)
+		}
+	}()
 	_, err = io.Copy(out, bytes.NewReader(buf))
 	if err != nil {
 		return "", node, err
@@ -110,16 +114,20 @@ func handleDbUploadErr(err error, dst string, node *Node) (string, error) {
 	if err.Error() == DUP_ENTRY_ERROR {
 		shortname, errdb := db.getShortnameForFilename(node.name)
 		if errdb != nil {
-			return "", fmt.Errorf("Failed to get filename! %s", errdb.Error())
+			return "", fmt.Errorf("failed to get filename: %s", errdb.Error())
 		}
 		return shortname, err
 	}
 	if err.Error() == DUP_ALIAS_ERROR {
-		os.Remove(dst)
-		return node.shortname, fmt.Errorf("This bucket/alias is already in use")
+		if err := os.Remove(dst); err != nil {
+			slog.Error("Failed to remove file", "file", dst, "error", err)
+		}
+		return node.shortname, fmt.Errorf("this bucket/alias is already in use")
 	}
 
-	os.Remove(dst)
+	if err := os.Remove(dst); err != nil {
+		slog.Error("Failed to remove file", "file", dst, "error", err)
+	}
 	return node.shortname, err
 }
 
@@ -136,7 +144,11 @@ func Upload(file *multipart.FileHeader, ip string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer src.Close()
+	defer func() {
+		if err := src.Close(); err != nil {
+			slog.Error("Failed to close file", "error", err)
+		}
+	}()
 
 	// Upload file to disk
 	dst, node, err := saveToDisk(src, file.Filename, ip)

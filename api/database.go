@@ -102,13 +102,13 @@ func (db *DBHelper) CheckRateLimit(ip string) error {
 	hits := db.getHitCounts(ip)
 
 	if settings.IPMinRateLimit > 0 && hits.minute >= settings.IPMinRateLimit {
-		return errors.New("Rate limit per minute exceeded")
+		return errors.New("rate limit per minute exceeded")
 	}
 	if settings.IPHourRateLimit > 0 && hits.hour >= settings.IPHourRateLimit {
-		return errors.New("Rate limit per hour exceeded")
+		return errors.New("rate limit per hour exceeded")
 	}
 	if settings.IPDayRateLimit > 0 && hits.day >= settings.IPDayRateLimit {
-		return errors.New("Rate limit per day exceeded")
+		return errors.New("rate limit per day exceeded")
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ func (db *DBHelper) checkShortName(name string) (string, error) {
 	var path string
 	index, err := StringToIdx(name)
 	if err != nil {
-		return "", fmt.Errorf("Failed to short filename!")
+		return "", fmt.Errorf("failed to short filename")
 	}
 	row := db.QueryRow("SELECT filename FROM files WHERE id = ?", index)
 	if err := row.Scan(&path); err != nil {
@@ -225,7 +225,11 @@ func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				slog.Error("Failed to close rows", "error", err)
+			}
+		}()
 
 		var results []map[string]string
 		for rows.Next() {
@@ -249,7 +253,11 @@ func (db *DBHelper) deleteExpiredFiles() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Error("Failed to close rows", "error", err)
+		}
+	}()
 
 	var files []string
 	for rows.Next() {
@@ -278,7 +286,11 @@ func (db *DBHelper) deleteOldestFiles(n int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Error("Failed to close rows", "error", err)
+		}
+	}()
 
 	_, err = db.Exec("DELETE FROM files WHERE id IN (SELECT id FROM files ORDER BY timestamp ASC LIMIT ?)", n)
 	if err != nil {

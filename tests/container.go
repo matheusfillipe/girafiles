@@ -81,7 +81,9 @@ func uploadFile(t *testing.T, url string, file io.Reader, expecServerError bool,
 		t.Fatal(err)
 	}
 
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	req, err := http.NewRequest("POST", url, formBody)
 	if err != nil {
@@ -97,7 +99,11 @@ func uploadFile(t *testing.T, url string, file io.Reader, expecServerError bool,
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("Failed to close response body: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -144,7 +150,11 @@ func dumpContainerLogs(t *testing.T, container testcontainers.Container) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer logs.Close()
+	defer func() {
+		if err := logs.Close(); err != nil {
+			t.Logf("Failed to close logs: %v", err)
+		}
+	}()
 	bytes, err := io.ReadAll(logs)
 	if err != nil {
 		t.Fatal(err)
