@@ -113,7 +113,15 @@
 
           <audio id="audio-preview" controls style="display: none; width: 100%; margin-top: 10px;"></audio>
 
-          <button id="upload-audio-btn" onclick="uploadAudio()" style="display: none; margin-top: 10px;">Upload Audio</button>
+          <!-- Audio staging area -->
+          <div id="audio-staging-area" style="display: none; margin-top: 30px;">
+            <h3>Recorded audios ready for upload:</h3>
+            <div id="staged-audio-list"></div>
+            <div class="upload-controls">
+              <button id="upload-all-audio-btn" onclick="uploadAllAudios()">Upload All Recordings</button>
+              <button id="clear-audio-btn" onclick="clearStagedAudios()">Clear All</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -299,6 +307,8 @@
       let recordingStartTime;
       let recordingInterval;
       let currentAudioBlob;
+      let stagedAudios = [];
+      let audioCounter = 1;
 
       function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
@@ -328,13 +338,11 @@
             };
 
             mediaRecorder.onstop = () => {
-              const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+              const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
               currentAudioBlob = audioBlob;
-              const audioUrl = URL.createObjectURL(audioBlob);
 
-              audioPreview.src = audioUrl;
-              audioPreview.style.display = 'block';
-              uploadBtn.style.display = 'inline-block';
+              // Automatically stage the recorded audio
+              stageCurrentAudio();
 
               // Stop all tracks to release microphone
               stream.getTracks().forEach(track => track.stop());
@@ -348,7 +356,6 @@
             recordBtn.disabled = true;
             stopBtn.disabled = false;
             audioPreview.style.display = 'none';
-            uploadBtn.style.display = 'none';
 
           } catch (err) {
             alert('Error accessing microphone: ' + err.message);
@@ -370,25 +377,139 @@
         }
       }
 
-      function uploadAudio() {
+      function stageCurrentAudio() {
         if (!currentAudioBlob) {
           alert('No audio recorded');
           return;
         }
 
-        const form = new FormData();
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `recording-${timestamp}.wav`;
-        form.append('file', currentAudioBlob, filename);
+        const audioName = `Recording ${audioCounter} (${timestamp.split('T')[1].substring(0, 8)})`;
 
-        fetch('/api/', {
-          method: 'POST',
-          body: form,
-        }).then((res) => res.json()).then((data) => {
-          window.location.href = data.url;
-        }).catch((error) => {
-          alert('Upload failed: ' + error.message);
+        const stagedAudio = {
+          name: audioName,
+          blob: currentAudioBlob,
+          url: URL.createObjectURL(currentAudioBlob),
+          timestamp: timestamp
+        };
+
+        stagedAudios.push(stagedAudio);
+        audioCounter++;
+
+        // Reset current recording state
+        currentAudioBlob = null;
+        document.getElementById('audio-preview').style.display = 'none';
+        document.getElementById('recording-time').textContent = '00:00';
+
+        updateAudioStagingArea();
+      }
+
+
+      function updateAudioStagingArea() {
+        const stagingArea = document.getElementById('audio-staging-area');
+        const audioList = document.getElementById('staged-audio-list');
+
+        if (stagedAudios.length === 0) {
+          stagingArea.style.display = 'none';
+          return;
+        }
+
+        stagingArea.style.display = 'block';
+
+        // Create audio list HTML
+        let audiosHTML = '<div class="staged-files">';
+        stagedAudios.forEach((audio, index) => {
+          audiosHTML += `
+            <div class="staged-file-item" data-index="${index}">
+              <div class="file-info">
+                <i class="fas fa-microphone"></i>
+                <span class="file-name">${audio.name}</span>
+              </div>
+              <div class="audio-controls">
+                <audio controls style="width: 200px; height: 30px;">
+                  <source src="${audio.url}" type="audio/webm">
+                </audio>
+                <button class="remove-file-btn" onclick="removeStagedAudio(${index})">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          `;
         });
+        audiosHTML += '</div>';
+
+        audioList.innerHTML = audiosHTML;
+      }
+
+      function removeStagedAudio(index) {
+        // Revoke the object URL to free memory
+        URL.revokeObjectURL(stagedAudios[index].url);
+        stagedAudios.splice(index, 1);
+        updateAudioStagingArea();
+      }
+
+      function clearStagedAudios() {
+        // Revoke all object URLs to free memory
+        stagedAudios.forEach(audio => URL.revokeObjectURL(audio.url));
+        stagedAudios = [];
+        updateAudioStagingArea();
+      }
+
+      async function uploadAllAudios() {
+        if (stagedAudios.length === 0) {
+          alert('No audio recordings to upload');
+          return;
+        }
+
+        const uploadBtn = document.getElementById('upload-all-audio-btn');
+        const originalText = uploadBtn.innerHTML;
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = 'Uploading...';
+
+        let audioResults = [];
+
+        try {
+          // Upload each audio separately
+          for (let i = 0; i < stagedAudios.length; i++) {
+            const audio = stagedAudios[i];
+            uploadBtn.innerHTML = `Uploading ${i + 1}/${stagedAudios.length}...`;
+
+            const form = new FormData();
+            const filename = `recording-${audio.timestamp}.webm`;
+            form.append('file', audio.blob, filename);
+
+            const response = await fetch('/api/', {
+              method: 'POST',
+              body: form,
+            });
+
+            const result = await response.json();
+            if (result.url) {
+              // Extract filename from URL
+              const filename = result.url.split('/').pop();
+              audioResults.push(filename);
+            }
+          }
+
+          if (audioResults.length > 0) {
+            if (audioResults.length === 1) {
+              // Single audio - redirect to audio page
+              window.location.href = '/' + audioResults[0];
+            } else {
+              // Multiple audios - redirect to group page
+              const groupId = audioResults.join(',');
+              window.location.href = '/group/' + groupId;
+            }
+          } else {
+            alert('No audio recordings were uploaded successfully');
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = originalText;
+          }
+        } catch (error) {
+          alert('Upload failed: ' + error.message);
+          uploadBtn.disabled = false;
+          uploadBtn.innerHTML = originalText;
+        }
       }
 
       // Tab functionality

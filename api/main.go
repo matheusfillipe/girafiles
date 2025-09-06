@@ -292,6 +292,7 @@ func StartServer() {
 			IsText      bool
 			IsImage     bool
 			IsAudio     bool
+			IsVideo     bool
 			PreviewText string
 		}
 
@@ -330,6 +331,8 @@ func StartServer() {
 					groupFile.IsImage = true
 				} else if strings.HasPrefix(file.mimetype, "audio/") {
 					groupFile.IsAudio = true
+				} else if strings.HasPrefix(file.mimetype, "video/") {
+					groupFile.IsVideo = true
 				}
 				validFiles++
 			}

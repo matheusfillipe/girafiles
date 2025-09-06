@@ -124,10 +124,94 @@
 
     .audio-preview {
       width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #2a2a2a;
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 120px;
+    }
+
+    .audio-player-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      width: 100%;
+    }
+
+    .audio-icon {
+      font-size: 36px;
+      color: #17a2b8;
+      margin-bottom: 10px;
     }
 
     .audio-preview audio {
       width: 100%;
+      max-width: 300px;
+    }
+
+    .video-preview {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #2a2a2a;
+      border-radius: 8px;
+      padding: 15px;
+      min-height: 120px;
+    }
+
+    .video-player-container {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .video-preview video {
+      width: 100%;
+      max-width: 300px;
+      max-height: 280px;
+      border-radius: 5px;
+    }
+
+    .binary-preview {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #2a2a2a;
+      border-radius: 8px;
+      padding: 40px 20px;
+      min-height: 120px;
+    }
+
+    .binary-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+    }
+
+    .binary-icon {
+      font-size: 48px;
+      color: #666;
+    }
+
+    .binary-text {
+      color: #999;
+      font-size: 16px;
+    }
+
+    .binary-info {
+      color: #777;
+      font-size: 12px;
+      font-family: monospace;
+      background-color: #333;
+      padding: 4px 8px;
+      border-radius: 4px;
     }
 
     .not-found-content {
@@ -278,16 +362,30 @@
               </div>
             {{ else if .IsAudio }}
               <div class="audio-preview">
-                <audio controls>
-                  <source src="/{{ .Name }}" type="{{ .MimeType }}">
-                  Your browser does not support the audio element.
-                </audio>
+                <div class="audio-player-container">
+                  <i class="fas fa-music audio-icon"></i>
+                  <audio controls>
+                    <source src="/{{ .Name }}" type="{{ .MimeType }}">
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              </div>
+            {{ else if .IsVideo }}
+              <div class="video-preview">
+                <div class="video-player-container">
+                  <video controls>
+                    <source src="/{{ .Name }}" type="{{ .MimeType }}">
+                    Your browser does not support the video element.
+                  </video>
+                </div>
               </div>
             {{ else }}
-              <div class="text-preview" style="text-align: center; padding: 40px;">
-                <i class="fas fa-file" style="font-size: 48px; margin-bottom: 10px; color: #666;"></i>
-                <br>
-                <span style="color: #999;">Binary file - no preview available</span>
+              <div class="binary-preview">
+                <div class="binary-content">
+                  <i class="fas fa-file binary-icon"></i>
+                  <span class="binary-text">Binary file - no preview available</span>
+                  <div class="binary-info">{{ .MimeType }}</div>
+                </div>
               </div>
             {{ end }}
           </div>
