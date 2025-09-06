@@ -274,6 +274,81 @@ func StartServer() {
 		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
 	})
 
+	files.GET("/group/:group", func(c *gin.Context) {
+		groupParam := c.Param("group")
+		fileNames := strings.Split(groupParam, ",")
+
+		if len(fileNames) == 0 {
+			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
+			return
+		}
+
+		type GroupFile struct {
+			Name        string
+			Content     []byte
+			MimeType    string
+			Size        string
+			Exists      bool
+			IsText      bool
+			IsImage     bool
+			IsAudio     bool
+			PreviewText string
+		}
+
+		var groupFiles []GroupFile
+		validFiles := 0
+
+		for _, fileName := range fileNames {
+			fileName = strings.TrimSpace(fileName)
+			if fileName == "" {
+				continue
+			}
+
+			file, err := Download(fileName)
+			groupFile := GroupFile{
+				Name:   fileName,
+				Exists: false,
+			}
+
+			if err == nil {
+				groupFile.Exists = true
+				groupFile.Content = file.content
+				groupFile.MimeType = file.mimetype
+				groupFile.Size = humanReadableSize(len(file.content))
+
+				// Determine file type for preview
+				if strings.HasPrefix(file.mimetype, "text/") || strings.Contains(file.mimetype, "json") || strings.Contains(file.mimetype, "xml") {
+					groupFile.IsText = true
+					// Limit preview text to first 500 characters
+					content := string(file.content)
+					if len(content) > 500 {
+						groupFile.PreviewText = content[:500] + "..."
+					} else {
+						groupFile.PreviewText = content
+					}
+				} else if strings.HasPrefix(file.mimetype, "image/") {
+					groupFile.IsImage = true
+				} else if strings.HasPrefix(file.mimetype, "audio/") {
+					groupFile.IsAudio = true
+				}
+				validFiles++
+			}
+
+			groupFiles = append(groupFiles, groupFile)
+		}
+
+		if validFiles == 0 {
+			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
+			return
+		}
+
+		c.HTML(http.StatusOK, "group.tmpl", gin.H{
+			"title":    settings.AppName,
+			"files":    groupFiles,
+			"groupUrl": fmt.Sprintf("%s/group/%s", getHostUrl(c.Request), groupParam),
+		})
+	})
+
 	files.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"title":          settings.AppName,

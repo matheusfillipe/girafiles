@@ -60,18 +60,24 @@
         </div>
 
         <div class="upload-container">
-          <div class="upload-box" ondrop="
-              event.preventDefault();
-              document.getElementById('file-upload').files = event.dataTransfer.files;
-              document.getElementById('file-upload-form').submit()
-              document.querySelector('.upload-box').classList.remove('dragover')
-              " ondragover="event.preventDefault(); document.querySelector('.upload-box').classList.add('dragover')"
-            ondragleave="document.querySelector('.upload-box').classList.remove('dragover')">
-            <form action="/api/?redirect=true" method="post" enctype="multipart/form-data" id="file-upload-form">
-              <label for="file-upload">Click or drop a file here to upload</label>
-              <input type="file" id="file-upload" name="file"
-                onchange="document.getElementById('file-upload-form').submit()">
-            </form>
+          <div id="upload-boxes-container">
+            <div class="upload-box" ondrop="handleFileDrop(event, this)"
+                ondragover="event.preventDefault(); this.classList.add('dragover')"
+                ondragleave="this.classList.remove('dragover')">
+              <label for="file-upload-0">Click or drop files here to stage for upload</label>
+              <input type="file" id="file-upload-0" name="file" multiple
+                onchange="handleFileSelect(event)">
+            </div>
+          </div>
+
+          <!-- File staging area -->
+          <div id="staging-area" style="display: none;">
+            <h3>Files ready for upload:</h3>
+            <div id="staged-files-list"></div>
+            <div class="upload-controls">
+              <button id="upload-all-btn" onclick="uploadAllFiles()">Upload All Files</button>
+              <button id="clear-files-btn" onclick="clearStagedFiles()">Clear All</button>
+            </div>
           </div>
         </div>
       </div>
@@ -145,6 +151,146 @@
           const param = language ? `?l=${language}` : '';
           window.location.href = `${data.url}/p${param}`;
         });
+      }
+
+      // File staging functionality
+      let stagedFiles = [];
+      let uploadResults = [];
+
+      function handleFileDrop(event, uploadBox) {
+        event.preventDefault();
+        uploadBox.classList.remove('dragover');
+
+        const files = Array.from(event.dataTransfer.files);
+        stageFiles(files);
+      }
+
+      function handleFileSelect(event) {
+        const files = Array.from(event.target.files);
+        stageFiles(files);
+        // Reset the input so the same files can be selected again if needed
+        event.target.value = '';
+      }
+
+      function stageFiles(files) {
+        if (files.length === 0) return;
+
+        // Add files to staging area (avoid duplicates by name)
+        files.forEach(file => {
+          const isDuplicate = stagedFiles.some(staged => staged.name === file.name && staged.size === file.size);
+          if (!isDuplicate) {
+            stagedFiles.push(file);
+          }
+        });
+
+        updateStagingArea();
+      }
+
+      function updateStagingArea() {
+        const stagingArea = document.getElementById('staging-area');
+        const filesList = document.getElementById('staged-files-list');
+
+        if (stagedFiles.length === 0) {
+          stagingArea.style.display = 'none';
+          return;
+        }
+
+        stagingArea.style.display = 'block';
+
+        // Create file list HTML
+        let filesHTML = '<div class="staged-files">';
+        stagedFiles.forEach((file, index) => {
+          const fileSize = formatFileSize(file.size);
+          filesHTML += `
+            <div class="staged-file-item" data-index="${index}">
+              <div class="file-info">
+                <i class="fas fa-file"></i>
+                <span class="file-name">${file.name}</span>
+                <span class="file-size">(${fileSize})</span>
+              </div>
+              <button class="remove-file-btn" onclick="removeFile(${index})">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          `;
+        });
+        filesHTML += '</div>';
+
+        filesList.innerHTML = filesHTML;
+      }
+
+      function removeFile(index) {
+        stagedFiles.splice(index, 1);
+        updateStagingArea();
+      }
+
+      function clearStagedFiles() {
+        stagedFiles = [];
+        updateStagingArea();
+      }
+
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+
+      async function uploadAllFiles() {
+        if (stagedFiles.length === 0) {
+          alert('No files to upload');
+          return;
+        }
+
+        const uploadBtn = document.getElementById('upload-all-btn');
+        const originalText = uploadBtn.innerHTML;
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = 'Uploading...';
+
+        uploadResults = [];
+
+        try {
+          // Upload each file separately
+          for (let i = 0; i < stagedFiles.length; i++) {
+            const file = stagedFiles[i];
+            uploadBtn.innerHTML = `Uploading ${i + 1}/${stagedFiles.length}...`;
+
+            const form = new FormData();
+            form.append('file', file);
+
+            const response = await fetch('/api/', {
+              method: 'POST',
+              body: form,
+            });
+
+            const result = await response.json();
+            if (result.url) {
+              // Extract filename from URL
+              const filename = result.url.split('/').pop();
+              uploadResults.push(filename);
+            }
+          }
+
+          if (uploadResults.length > 0) {
+            if (uploadResults.length === 1) {
+              // Single file - redirect to file page
+              window.location.href = '/' + uploadResults[0];
+            } else {
+              // Multiple files - redirect to group page
+              const groupId = uploadResults.join(',');
+              window.location.href = '/group/' + groupId;
+            }
+          } else {
+            alert('No files were uploaded successfully');
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = originalText;
+          }
+        } catch (error) {
+          alert('Upload failed: ' + error.message);
+          uploadBtn.disabled = false;
+          uploadBtn.innerHTML = originalText;
+        }
       }
 
       // Audio recording functionality
