@@ -15,119 +15,120 @@
 </head>
 
 <body>
-  <div class="container">
-    <h1>Welcome to {{ .title }}</h1>
-    <p>Store and share your files securely with {{ .title }}.</p>
+   <div class="container">
+     <h1>Welcome to {{ .title }}</h1>
+     <p>Store and share your files securely with {{ .title }}.</p>
 
-    <table>
-      <tr>
-        <td>Max File Size</td>
-        <td>{{ .filesize }}MB</td>
-      </tr>
-      <tr>
-        <td>Max Upload Per Day</td>
-        <td>{{ .ratelimit }} files</td>
-      </tr>
-      <tr>
-        <td>Your files will be kept for</td>
-        <td>{{ .persistance }} hours</td>
-      </tr>
-      {{ if .storeLimit }}
-      <tr>
-        <td>Deletion</td>
-        <td>The server may delete earlier if running out of space</td>
-      </tr>
-      {{ end }}
-    </table>
+       {{ if .authRequired}}
+       <p>Only API uploads are accepted</p>
+       {{ else}}
+       <div class="tabs">
+       <div class="tab-buttons">
+         <button class="tab-button active" onclick="openTab(event, 'upload-tab')">File Upload</button>
+         <button class="tab-button" onclick="openTab(event, 'paste-tab')">Text Paste</button>
+         <button class="tab-button" onclick="openTab(event, 'audio-tab')">Audio Record</button>
+         <button class="tab-button" onclick="openTab(event, 'limits-tab')">Limits</button>
+       </div>
 
-    {{ if .authRequired}}
-    <p>Only API uploads are accepted</p>
-    {{ else}}
-    <div class="tabs">
-      <div class="tab-buttons">
-        <button class="tab-button active" onclick="openTab(event, 'upload-tab')">File Upload</button>
-        <button class="tab-button" onclick="openTab(event, 'paste-tab')">Text Paste</button>
-        <button class="tab-button" onclick="openTab(event, 'audio-tab')">Audio Record</button>
-      </div>
+         <div id="upload-tab" class="tab-content active">
+           <div class="code-container">
+             <h4 style="text-align: start;">Curl upload</h4>
+             <div class="code-line">
+               <pre style="background-color: #111;"><code>curl -s -F "file=@/path/to/file" {{ .uploadEP }}</code></pre>
+               <button onclick="copyCode()">Copy</button>
+             </div>
+           </div>
 
-      <div id="upload-tab" class="tab-content active">
-        <div class="code-container">
-          <h4 style="text-align: start;">Curl upload</h4>
-          <div class="code-line">
-            <pre style="background-color: #111;"><code>curl -s -F "file=@/path/to/file" {{ .uploadEP }}</code></pre>
-            <button onclick="copyCode()">Copy</button>
-          </div>
+           <div class="upload-container">
+             <div id="upload-boxes-container">
+               <div class="upload-box" ondrop="handleFileDrop(event, this)"
+                   ondragover="event.preventDefault(); this.classList.add('dragover')"
+                   ondragleave="this.classList.remove('dragover')">
+                 <label for="file-upload-0">Click or drop files here to stage for upload</label>
+                 <input type="file" id="file-upload-0" name="file" multiple
+                   onchange="handleFileSelect(event)">
+               </div>
+             </div>
+
+             <!-- File staging area -->
+             <div id="staging-area" style="display: none;">
+               <h3>Files ready for upload:</h3>
+               <div id="staged-files-list"></div>
+               <div class="upload-controls">
+                 <button id="upload-all-btn" onclick="uploadAllFiles()">Upload All Files</button>
+                 <button id="clear-files-btn" onclick="clearStagedFiles()">Clear All</button>
+               </div>
+             </div>
+           </div>
+         </div>
+
+         <div id="paste-tab" class="tab-content">
+           <div class="pastebin">
+             <div class="language-picker">
+               <label for="language">Select Language:</label>
+               <select id="language" value="plaintext">
+                 {{ range $name, $val := .pasteLanguages }}
+                 <option value="{{ $val }}" {{ if eq $val "" }}selected{{ end }}>{{ $name }}</option>
+                 {{ end }}
+               </select>
+             </div>
+             <textarea id="code-input" placeholder="Paste your code here..."></textarea>
+             <div class="pastebin-controls">
+               <button onclick="submitPaste()">Send</button>
+             </div>
+           </div>
+         </div>
+
+       <div id="audio-tab" class="tab-content">
+         <div class="voice-recorder">
+
+           <div class="recorder-controls">
+             <button id="record-btn" onclick="toggleRecording()">Start Recording</button>
+             <button id="stop-btn" onclick="stopRecording()" disabled>Stop</button>
+             <span id="recording-time">00:00</span>
+           </div>
+
+           <audio id="audio-preview" controls style="display: none; width: 100%; margin-top: 10px;"></audio>
+
+           <!-- Audio staging area -->
+           <div id="audio-staging-area" style="display: none; margin-top: 30px;">
+             <h3>Recorded audios ready for upload:</h3>
+             <div id="staged-audio-list"></div>
+             <div class="upload-controls">
+               <button id="upload-all-audio-btn" onclick="uploadAllAudios()">Upload All Recordings</button>
+               <button id="clear-audio-btn" onclick="clearStagedAudios()">Clear All</button>
+             </div>
+           </div>
+         </div>
+       </div>
+
+       <div id="limits-tab" class="tab-content">
+         <h2>Upload Limits</h2>
+         <table>
+           <tr>
+             <td>Max File Size</td>
+             <td>{{ .filesize }}MB</td>
+           </tr>
+           <tr>
+             <td>Max Upload Per Day</td>
+             <td>{{ .ratelimit }} files</td>
+           </tr>
+           <tr>
+             <td>Your files will be kept for</td>
+             <td>{{ .persistance }} hours</td>
+           </tr>
+           {{ if .storeLimit }}
+           <tr>
+             <td>Deletion</td>
+             <td>The server may delete earlier if running out of space</td>
+           </tr>
+           {{ end }}
+         </table>
         </div>
-
-        <div class="upload-container">
-          <div id="upload-boxes-container">
-            <div class="upload-box" ondrop="handleFileDrop(event, this)"
-                ondragover="event.preventDefault(); this.classList.add('dragover')"
-                ondragleave="this.classList.remove('dragover')">
-              <label for="file-upload-0">Click or drop files here to stage for upload</label>
-              <input type="file" id="file-upload-0" name="file" multiple
-                onchange="handleFileSelect(event)">
-            </div>
-          </div>
-
-          <!-- File staging area -->
-          <div id="staging-area" style="display: none;">
-            <h3>Files ready for upload:</h3>
-            <div id="staged-files-list"></div>
-            <div class="upload-controls">
-              <button id="upload-all-btn" onclick="uploadAllFiles()">Upload All Files</button>
-              <button id="clear-files-btn" onclick="clearStagedFiles()">Clear All</button>
-            </div>
-          </div>
-        </div>
       </div>
+      {{ end}}
 
-      <div id="paste-tab" class="tab-content">
-        <div class="pastebin">
-          <h1>Create a Paste</h1>
-
-          <div class="language-picker">
-            <label for="language">Select Language:</label>
-            <select id="language" value="plaintext">
-              {{ range $name, $val := .pasteLanguages }}
-              <option value="{{ $val }}" {{ if eq $val "" }}selected{{ end }}>{{ $name }}</option>
-              {{ end }}
-            </select>
-          </div>
-          <textarea id="code-input" placeholder="Paste your code here..."></textarea>
-          <div class="pastebin-controls">
-            <button onclick="submitPaste()">Send</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="audio-tab" class="tab-content">
-        <div class="voice-recorder">
-          <h1>Record Audio</h1>
-
-          <div class="recorder-controls">
-            <button id="record-btn" onclick="toggleRecording()">Start Recording</button>
-            <button id="stop-btn" onclick="stopRecording()" disabled>Stop</button>
-            <span id="recording-time">00:00</span>
-          </div>
-
-          <audio id="audio-preview" controls style="display: none; width: 100%; margin-top: 10px;"></audio>
-
-          <!-- Audio staging area -->
-          <div id="audio-staging-area" style="display: none; margin-top: 30px;">
-            <h3>Recorded audios ready for upload:</h3>
-            <div id="staged-audio-list"></div>
-            <div class="upload-controls">
-              <button id="upload-all-audio-btn" onclick="uploadAllAudios()">Upload All Recordings</button>
-              <button id="clear-audio-btn" onclick="clearStagedAudios()">Clear All</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    {{ end}}
-
-    <div class="footer">
+      <div class="footer">
       <a href="https://github.com/matheusfillipe/girafiles" class="github-link"><i class="fab fa-github"></i> GitHub</a>
     </div>
 

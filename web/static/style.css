@@ -8,11 +8,11 @@ body {
 }
 
 .container {
-  flex: 1;
-  max-width: 90%;
-  margin: 0 auto;
-  padding-bottom: 50px;
-  /* Height of the footer */
+   flex: 1;
+   max-width: 90%;
+   margin: 0 auto;
+   padding-bottom: 50px;
+   /* Height of the footer */
 }
 
 @media (max-width: 900px) {
@@ -23,14 +23,14 @@ body {
 }
 
 h1 {
-  font-size: 24px;
+   font-size: 24px;
 }
 
 table {
-  width: 100%;
-  margin-top: 100px;
-  border-collapse: separate;
-  border-spacing: 0 10px;
+   width: 100%;
+   margin-top: 100px;
+   border-collapse: separate;
+   border-spacing: 0 10px;
 }
 
 th,
@@ -256,24 +256,24 @@ button {
 }
 
 .tab-buttons {
-  display: flex;
-  border-bottom: 2px solid #444;
-  margin-bottom: 20px;
-  gap: 0;
+   text-align: center;
+   border-bottom: 2px solid #444;
+   margin-bottom: 20px;
 }
 
 .tab-button {
-  background-color: #222;
-  border: none;
-  padding: 15px 25px;
-  cursor: pointer;
-  color: #ccc;
-  font-size: 16px;
-  border-radius: 0;
-  margin: 0;
-  flex: 1;
-  transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
+   background-color: #222;
+   border: none;
+   padding: 15px 25px;
+   cursor: pointer;
+   color: #ccc;
+   font-size: 16px;
+   border-radius: 0;
+   margin: 0;
+   display: inline-block;
+   width: 150px;
+   transition: all 0.3s ease;
+   border-bottom: 3px solid transparent;
 }
 
 .tab-button:hover {
