@@ -54,6 +54,15 @@
              <div id="staging-area" style="display: none;">
                <h3>Files ready for upload:</h3>
                <div id="staged-files-list"></div>
+               <div id="upload-progress-container" style="display: none; margin: 15px 0;">
+                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px;">
+                   <span id="upload-progress-text">Uploading...</span>
+                   <span id="upload-progress-percentage">0%</span>
+                 </div>
+                 <div style="width: 100%; height: 8px; background-color: #f0f0f0; border-radius: 4px; overflow: hidden;">
+                   <div id="upload-progress-bar" style="width: 0%; height: 100%; background-color: #4CAF50; transition: width 0.3s ease;"></div>
+                 </div>
+               </div>
                <div class="upload-controls">
                  <button id="upload-all-btn" onclick="uploadAllFiles()">Upload All Files</button>
                  <button id="clear-files-btn" onclick="clearStagedFiles()">Clear All</button>
@@ -94,6 +103,15 @@
            <div id="audio-staging-area" style="display: none; margin-top: 30px;">
              <h3>Recorded audios ready for upload:</h3>
              <div id="staged-audio-list"></div>
+             <div id="audio-progress-container" style="display: none; margin: 15px 0;">
+               <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px;">
+                 <span id="audio-progress-text">Uploading...</span>
+                 <span id="audio-progress-percentage">0%</span>
+               </div>
+               <div style="width: 100%; height: 8px; background-color: #f0f0f0; border-radius: 4px; overflow: hidden;">
+                 <div id="audio-progress-bar" style="width: 0%; height: 100%; background-color: #4CAF50; transition: width 0.3s ease;"></div>
+               </div>
+             </div>
              <div class="upload-controls">
                <button id="upload-all-audio-btn" onclick="uploadAllAudios()">Upload All Recordings</button>
                <button id="clear-audio-btn" onclick="clearStagedAudios()">Clear All</button>
@@ -246,6 +264,42 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
       }
 
+      function uploadFileWithProgress(file, onProgress) {
+        return new Promise((resolve, reject) => {
+          const form = new FormData();
+          form.append('file', file);
+
+          const xhr = new XMLHttpRequest();
+
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const percentComplete = (e.loaded / e.total) * 100;
+              onProgress(percentComplete);
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const result = JSON.parse(xhr.responseText);
+                resolve(result);
+              } catch (e) {
+                reject(new Error('Invalid response format'));
+              }
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          });
+
+          xhr.addEventListener('error', () => {
+            reject(new Error('Network error during upload'));
+          });
+
+          xhr.open('POST', '/api/');
+          xhr.send(form);
+        });
+      }
+
       async function uploadAllFiles() {
         if (stagedFiles.length === 0) {
           alert('No files to upload');
@@ -253,33 +307,52 @@
         }
 
         const uploadBtn = document.getElementById('upload-all-btn');
+        const progressContainer = document.getElementById('upload-progress-container');
+        const progressBar = document.getElementById('upload-progress-bar');
+        const progressText = document.getElementById('upload-progress-text');
+        const progressPercentage = document.getElementById('upload-progress-percentage');
         const originalText = uploadBtn.innerHTML;
+
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = 'Uploading...';
+        progressContainer.style.display = 'block';
 
         uploadResults = [];
 
         try {
-          // Upload each file separately
+          // Calculate total bytes across all files
+          const totalBytes = stagedFiles.reduce((sum, file) => sum + file.size, 0);
+          let uploadedBytes = 0;
+
+          // Upload each file separately with size-weighted progress tracking
           for (let i = 0; i < stagedFiles.length; i++) {
             const file = stagedFiles[i];
-            uploadBtn.innerHTML = `Uploading ${i + 1}/${stagedFiles.length}...`;
+            const fileSize = file.size;
 
-            const form = new FormData();
-            form.append('file', file);
+            progressText.textContent = `Uploading ${i + 1}/${stagedFiles.length}: ${file.name}`;
 
-            const response = await fetch('/api/', {
-              method: 'POST',
-              body: form,
+            const result = await uploadFileWithProgress(file, (fileProgress) => {
+              // Calculate bytes uploaded for current file
+              const currentFileBytes = (fileProgress / 100) * fileSize;
+              // Total progress is (previously uploaded + current file progress) / total
+              const totalProgress = ((uploadedBytes + currentFileBytes) / totalBytes) * 100;
+              progressBar.style.width = totalProgress + '%';
+              progressPercentage.textContent = Math.round(totalProgress) + '%';
             });
 
-            const result = await response.json();
             if (result.url) {
               // Extract filename from URL
               const filename = result.url.split('/').pop();
               uploadResults.push(filename);
+              // Mark this file's bytes as fully uploaded
+              uploadedBytes += fileSize;
             }
           }
+
+          // Show completion
+          progressBar.style.width = '100%';
+          progressPercentage.textContent = '100%';
+          progressText.textContent = 'Upload complete!';
 
           if (uploadResults.length > 0) {
             if (uploadResults.length === 1) {
@@ -294,11 +367,14 @@
             alert('No files were uploaded successfully');
             uploadBtn.disabled = false;
             uploadBtn.innerHTML = originalText;
+            progressContainer.style.display = 'none';
           }
         } catch (error) {
           alert('Upload failed: ' + error.message);
           uploadBtn.disabled = false;
           uploadBtn.innerHTML = originalText;
+          progressContainer.style.display = 'none';
+          progressBar.style.width = '0%';
         }
       }
 
@@ -456,6 +532,42 @@
         updateAudioStagingArea();
       }
 
+      function uploadBlobWithProgress(blob, filename, onProgress) {
+        return new Promise((resolve, reject) => {
+          const form = new FormData();
+          form.append('file', blob, filename);
+
+          const xhr = new XMLHttpRequest();
+
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const percentComplete = (e.loaded / e.total) * 100;
+              onProgress(percentComplete);
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const result = JSON.parse(xhr.responseText);
+                resolve(result);
+              } catch (e) {
+                reject(new Error('Invalid response format'));
+              }
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          });
+
+          xhr.addEventListener('error', () => {
+            reject(new Error('Network error during upload'));
+          });
+
+          xhr.open('POST', '/api/');
+          xhr.send(form);
+        });
+      }
+
       async function uploadAllAudios() {
         if (stagedAudios.length === 0) {
           alert('No audio recordings to upload');
@@ -463,34 +575,53 @@
         }
 
         const uploadBtn = document.getElementById('upload-all-audio-btn');
+        const progressContainer = document.getElementById('audio-progress-container');
+        const progressBar = document.getElementById('audio-progress-bar');
+        const progressText = document.getElementById('audio-progress-text');
+        const progressPercentage = document.getElementById('audio-progress-percentage');
         const originalText = uploadBtn.innerHTML;
+
         uploadBtn.disabled = true;
         uploadBtn.innerHTML = 'Uploading...';
+        progressContainer.style.display = 'block';
 
         let audioResults = [];
 
         try {
-          // Upload each audio separately
+          // Calculate total bytes across all audio recordings
+          const totalBytes = stagedAudios.reduce((sum, audio) => sum + audio.blob.size, 0);
+          let uploadedBytes = 0;
+
+          // Upload each audio separately with size-weighted progress tracking
           for (let i = 0; i < stagedAudios.length; i++) {
             const audio = stagedAudios[i];
-            uploadBtn.innerHTML = `Uploading ${i + 1}/${stagedAudios.length}...`;
-
-            const form = new FormData();
+            const audioSize = audio.blob.size;
             const filename = `recording-${audio.timestamp}.webm`;
-            form.append('file', audio.blob, filename);
 
-            const response = await fetch('/api/', {
-              method: 'POST',
-              body: form,
+            progressText.textContent = `Uploading ${i + 1}/${stagedAudios.length}: ${audio.name}`;
+
+            const result = await uploadBlobWithProgress(audio.blob, filename, (audioProgress) => {
+              // Calculate bytes uploaded for current audio
+              const currentAudioBytes = (audioProgress / 100) * audioSize;
+              // Total progress is (previously uploaded + current audio progress) / total
+              const totalProgress = ((uploadedBytes + currentAudioBytes) / totalBytes) * 100;
+              progressBar.style.width = totalProgress + '%';
+              progressPercentage.textContent = Math.round(totalProgress) + '%';
             });
 
-            const result = await response.json();
             if (result.url) {
               // Extract filename from URL
               const filename = result.url.split('/').pop();
               audioResults.push(filename);
+              // Mark this audio's bytes as fully uploaded
+              uploadedBytes += audioSize;
             }
           }
+
+          // Show completion
+          progressBar.style.width = '100%';
+          progressPercentage.textContent = '100%';
+          progressText.textContent = 'Upload complete!';
 
           if (audioResults.length > 0) {
             if (audioResults.length === 1) {
@@ -505,11 +636,14 @@
             alert('No audio recordings were uploaded successfully');
             uploadBtn.disabled = false;
             uploadBtn.innerHTML = originalText;
+            progressContainer.style.display = 'none';
           }
         } catch (error) {
           alert('Upload failed: ' + error.message);
           uploadBtn.disabled = false;
           uploadBtn.innerHTML = originalText;
+          progressContainer.style.display = 'none';
+          progressBar.style.width = '0%';
         }
       }
 
