@@ -6,7 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/docker/go-connections v0.6.0
-	github.com/gabriel-vasile/mimetype v1.4.8
+	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/gin-gonic/gin v1.10.1
 	github.com/joho/godotenv v1.5.1
 	github.com/jxskiss/base62 v1.1.0
