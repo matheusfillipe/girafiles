@@ -19,9 +19,6 @@
      <h1>Welcome to {{ .title }}</h1>
      <p>Store and share your files securely with {{ .title }}.</p>
 
-       {{ if .authRequired}}
-       <p>Only API uploads are accepted</p>
-       {{ else}}
        <div class="tabs">
        <div class="tab-buttons">
          <button class="tab-button active" onclick="openTab(event, 'upload-tab')">File Upload</button>
@@ -144,7 +141,6 @@
          </table>
         </div>
       </div>
-      {{ end}}
 
       <div class="footer">
       <a href="https://github.com/matheusfillipe/girafiles" class="github-link"><i class="fab fa-github"></i> GitHub</a>

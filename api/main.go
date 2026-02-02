@@ -41,7 +41,9 @@ func checkAuth(c *gin.Context) bool {
 	users := GetSettings().Users
 	gin.BasicAuth(gin.Accounts(users))(c)
 	if c.IsAborted() {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		}
 		return false
 	}
 	return true
@@ -189,7 +191,14 @@ func StartServer() {
 	})
 
 	api.POST("/", postFile(CONTENT_TYPE_JSON))
-	router.POST("/", postFile(CONTENT_TYPE_TEXT))
+	files.POST("/", func(c *gin.Context) {
+		if settings.IsAuthEnabled() {
+			if !checkAuth(c) {
+				return
+			}
+		}
+		postFile(CONTENT_TYPE_TEXT)(c)
+	})
 
 	api.PUT("/:name/:alias", func(c *gin.Context) {
 		var fb FileBucket
@@ -353,6 +362,11 @@ func StartServer() {
 	})
 
 	files.GET("/", func(c *gin.Context) {
+		if settings.IsAuthEnabled() {
+			if !checkAuth(c) {
+				return
+			}
+		}
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"title":          settings.AppName,
 			"filesize":       formatIntUnlimitedIf0(settings.FileSizeLimit),
