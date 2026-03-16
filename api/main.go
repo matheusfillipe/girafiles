@@ -111,6 +111,20 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 	}
 }
 
+func deliverHead(c *gin.Context, err error, mime string, size int64) {
+	if err != nil {
+		if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Header("Content-Type", mime)
+	c.Header("Content-Length", fmt.Sprintf("%d", size))
+	c.Status(http.StatusOK)
+}
+
 func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
 	if err != nil {
 		if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
@@ -243,6 +257,15 @@ func StartServer() {
 		file, err := Download(f.Name)
 		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
 	})
+	files.HEAD("/:name", func(c *gin.Context) {
+		var f File
+		if err := c.ShouldBindUri(&f); err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		mime, size, err := GetMimeInfo(f.Name)
+		deliverHead(c, err, mime, size)
+	})
 
 	files.GET("/:name/p", func(c *gin.Context) {
 		var f File
@@ -281,6 +304,15 @@ func StartServer() {
 		}
 		file, err := DownloadFromBucket(fb.Bucket, fb.Name)
 		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
+	})
+	files.HEAD("/:name/:alias", func(c *gin.Context) {
+		var fb FileBucket
+		if err := c.ShouldBindUri(&fb); err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		mime, size, err := GetMimeInfoFromBucket(fb.Bucket, fb.Name)
+		deliverHead(c, err, mime, size)
 	})
 
 	files.GET("/group/:group", func(c *gin.Context) {

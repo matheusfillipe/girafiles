@@ -234,6 +234,53 @@ func DownloadFromBucket(bucket string, alias string) (fileResponse, error) {
 	return loadFromDisk(name, alias)
 }
 
+func getMimeAndSize(name string) (string, int64, error) {
+	settings := GetSettings()
+	name = strings.SplitN(name, "@", 2)[0]
+	dst := filepath.Join(settings.GetFileStoragePath(), name)
+
+	info, err := os.Stat(dst)
+	if err != nil {
+		return "", 0, err
+	}
+
+	f, err := os.Open(dst)
+	if err != nil {
+		return "", 0, err
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			slog.Error("Failed to close file", "error", err)
+		}
+	}()
+
+	m, err := mimetype.DetectReader(f)
+	if err != nil {
+		return "", info.Size(), err
+	}
+	return m.String(), info.Size(), nil
+}
+
+func GetMimeInfo(n string) (string, int64, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+	name, err := GetDB().checkShortName(n)
+	if err != nil {
+		return "", 0, err
+	}
+	return getMimeAndSize(name)
+}
+
+func GetMimeInfoFromBucket(bucket, alias string) (string, int64, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+	name, err := GetDB().checkAlias(bucket, alias)
+	if err != nil {
+		return "", 0, err
+	}
+	return getMimeAndSize(name)
+}
+
 func isStorageLimitExceeded() bool {
 	settings := GetSettings()
 
