@@ -315,6 +315,22 @@ func StartServer() {
 		deliverHead(c, err, mime, size)
 	})
 
+	files.HEAD("/group/:group", func(c *gin.Context) {
+		groupParam := c.Param("group")
+		for _, fileName := range strings.Split(groupParam, ",") {
+			fileName = strings.TrimSpace(fileName)
+			if fileName == "" {
+				continue
+			}
+			if _, _, err := GetMimeInfo(fileName); err == nil {
+				c.Header("Content-Type", "text/html; charset=utf-8")
+				c.Status(http.StatusOK)
+				return
+			}
+		}
+		c.Status(http.StatusNotFound)
+	})
+
 	files.GET("/group/:group", func(c *gin.Context) {
 		groupParam := c.Param("group")
 		fileNames := strings.Split(groupParam, ",")
