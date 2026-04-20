@@ -3,7 +3,7 @@ module github.com/matheusfillipe/girafiles
 go 1.25.0
 
 require (
-	github.com/docker/go-connections v0.6.0
+	github.com/docker/go-connections v0.7.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/gin-gonic/gin v1.12.0
 	github.com/joho/godotenv v1.5.1
