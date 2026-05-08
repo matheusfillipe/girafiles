@@ -111,6 +111,13 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 	}
 }
 
+// CORS for file delivery
+func setCORSHeaders(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	c.Header("Access-Control-Expose-Headers", "Content-Type, Content-Length")
+}
+
 func deliverHead(c *gin.Context, err error, mime string, size int64) {
 	if err != nil {
 		if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
@@ -120,6 +127,7 @@ func deliverHead(c *gin.Context, err error, mime string, size int64) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+	setCORSHeaders(c)
 	c.Header("Content-Type", mime)
 	c.Header("Content-Length", fmt.Sprintf("%d", size))
 	c.Status(http.StatusOK)
@@ -136,9 +144,11 @@ func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
 	// If mime type is supported to be displayed in the browser, display it.
 	// otherwise, download it.
 	if isSupportedMimetype(file.mimetype) && !download {
+		setCORSHeaders(c)
 		c.Data(http.StatusOK, file.mimetype, file.content)
 		return
 	} else if download {
+		setCORSHeaders(c)
 		c.Header("Content-Disposition", "attachment; filename="+file.name)
 		c.Data(http.StatusOK, file.mimetype, file.content)
 	} else {
@@ -256,6 +266,20 @@ func StartServer() {
 		}
 		file, err := Download(f.Name)
 		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
+	})
+	// CORS preflight for file routes — browsers send OPTIONS when the GET carries
+	// custom headers (e.g. Range from probe-via-GET-bytes-0-0).
+	files.OPTIONS("/:name", func(c *gin.Context) {
+		setCORSHeaders(c)
+		c.Header("Access-Control-Allow-Headers", "Range, Content-Type")
+		c.Header("Access-Control-Max-Age", "86400")
+		c.Status(http.StatusNoContent)
+	})
+	files.OPTIONS("/:name/:alias", func(c *gin.Context) {
+		setCORSHeaders(c)
+		c.Header("Access-Control-Allow-Headers", "Range, Content-Type")
+		c.Header("Access-Control-Max-Age", "86400")
+		c.Status(http.StatusNoContent)
 	})
 	files.HEAD("/:name", func(c *gin.Context) {
 		var f File
