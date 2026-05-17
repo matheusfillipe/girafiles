@@ -645,6 +645,11 @@
 
       // Tab functionality
       function openTab(evt, tabName) {
+        activateTab(tabName);
+        evt.currentTarget.classList.add('active');
+      }
+
+      function activateTab(tabName) {
         const tabcontent = document.getElementsByClassName('tab-content');
         for (let i = 0; i < tabcontent.length; i++) {
           tabcontent[i].classList.remove('active');
@@ -656,8 +661,70 @@
         }
 
         document.getElementById(tabName).classList.add('active');
-        evt.currentTarget.classList.add('active');
+        for (let i = 0; i < tablinks.length; i++) {
+          const onclick = tablinks[i].getAttribute('onclick') || '';
+          if (onclick.indexOf("'" + tabName + "'") !== -1) {
+            tablinks[i].classList.add('active');
+            break;
+          }
+        }
       }
+
+      // Clipboard paste: images -> stage in upload tab, text -> fill paste tab
+      function flashStagingArea(id) {
+        const area = document.getElementById(id);
+        if (!area) return;
+        const orig = area.style.boxShadow;
+        area.style.transition = 'box-shadow 0.3s ease';
+        area.style.boxShadow = '0 0 0 3px #4CAF50';
+        setTimeout(() => { area.style.boxShadow = orig; }, 700);
+      }
+
+      document.addEventListener('paste', (event) => {
+        const cd = event.clipboardData;
+        if (!cd) return;
+
+        const items = cd.items ? Array.from(cd.items) : [];
+        const imageFiles = [];
+
+        for (const item of items) {
+          if (item.kind === 'file' && item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (!file) continue;
+            const ext = (item.type.split('/')[1] || 'png').split('+')[0];
+            const time = new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
+            const renamed = new File([file], `pasted-image-${time}.${ext}`, { type: file.type });
+            imageFiles.push(renamed);
+          }
+        }
+
+        if (imageFiles.length > 0) {
+          event.preventDefault();
+          stageFiles(imageFiles);
+          activateTab('upload-tab');
+          flashStagingArea('staging-area');
+          return;
+        }
+
+        const target = event.target;
+        const isEditable = target && (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        );
+        if (isEditable) return;
+
+        const text = cd.getData('text/plain');
+        if (!text) return;
+
+        event.preventDefault();
+        const input = document.getElementById('code-input');
+        input.value = input.value ? input.value + '\n' + text : text;
+        activateTab('paste-tab');
+        input.focus();
+        input.selectionStart = input.selectionEnd = input.value.length;
+        flashStagingArea('paste-tab');
+      });
     </script>
     <script src="/static/shared.js"></script>
 </body>
