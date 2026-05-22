@@ -397,6 +397,16 @@ button {
   width: 16px;
 }
 
+.file-thumb {
+  width: 128px;
+  height: 128px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-right: 10px;
+  background-color: #222;
+  flex-shrink: 0;
+}
+
 .file-name {
   color: #fff;
   margin-right: 10px;
@@ -440,6 +450,11 @@ button {
   cursor: pointer;
   border: none;
   transition: all 0.2s;
+}
+
+.upload-controls button:focus-visible {
+  outline: 2px solid #4CAF50;
+  outline-offset: 2px;
 }
 
 #upload-all-btn {

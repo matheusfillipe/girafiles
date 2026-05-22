@@ -202,6 +202,10 @@
         files.forEach(file => {
           const isDuplicate = stagedFiles.some(staged => staged.name === file.name && staged.size === file.size);
           if (!isDuplicate) {
+            // Image files get an object URL for thumbnail preview, revoked on removal
+            if (file.type.startsWith('image/')) {
+              file.previewUrl = URL.createObjectURL(file);
+            }
             stagedFiles.push(file);
           }
         });
@@ -224,10 +228,13 @@
         let filesHTML = '<div class="staged-files">';
         stagedFiles.forEach((file, index) => {
           const fileSize = formatFileSize(file.size);
+          const thumb = file.previewUrl
+            ? `<img src="${file.previewUrl}" class="file-thumb" alt="">`
+            : `<i class="fas fa-file"></i>`;
           filesHTML += `
             <div class="staged-file-item" data-index="${index}">
               <div class="file-info">
-                <i class="fas fa-file"></i>
+                ${thumb}
                 <span class="file-name">${file.name}</span>
                 <span class="file-size">(${fileSize})</span>
               </div>
@@ -243,11 +250,13 @@
       }
 
       function removeFile(index) {
+        if (stagedFiles[index].previewUrl) URL.revokeObjectURL(stagedFiles[index].previewUrl);
         stagedFiles.splice(index, 1);
         updateStagingArea();
       }
 
       function clearStagedFiles() {
+        stagedFiles.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
         stagedFiles = [];
         updateStagingArea();
       }
@@ -671,6 +680,19 @@
       }
 
       // Clipboard paste: images -> stage in upload tab, text -> fill paste tab
+      function uniquePastedName(base, ext, batch) {
+        const taken = (candidate) =>
+          stagedFiles.some(f => f.name === candidate) ||
+          batch.some(f => f.name === candidate);
+        let name = `${base}.${ext}`;
+        let n = 2;
+        while (taken(name)) {
+          name = `${base}-${n}.${ext}`;
+          n++;
+        }
+        return name;
+      }
+
       function flashStagingArea(id) {
         const area = document.getElementById(id);
         if (!area) return;
@@ -693,7 +715,8 @@
             if (!file) continue;
             const ext = (item.type.split('/')[1] || 'png').split('+')[0];
             const time = new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
-            const renamed = new File([file], `pasted-image-${time}.${ext}`, { type: file.type });
+            const name = uniquePastedName(`pasted-image-${time}`, ext, imageFiles);
+            const renamed = new File([file], name, { type: file.type });
             imageFiles.push(renamed);
           }
         }
@@ -703,6 +726,8 @@
           stageFiles(imageFiles);
           activateTab('upload-tab');
           flashStagingArea('staging-area');
+          // Focus Upload All so Enter uploads; Tab reaches Clear All; Ctrl+V again adds more
+          document.getElementById('upload-all-btn').focus();
           return;
         }
 
@@ -724,6 +749,14 @@
         input.focus();
         input.selectionStart = input.selectionEnd = input.value.length;
         flashStagingArea('paste-tab');
+      });
+
+      // Esc clears staged files, unless typing in a field (preserve native Esc)
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || stagedFiles.length === 0) return;
+        const t = document.activeElement;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        clearStagedFiles();
       });
     </script>
     <script src="/static/shared.js"></script>
