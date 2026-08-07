@@ -88,19 +88,33 @@ func saveToDisk(src io.Reader, filename string, ip string) (string, *Node, error
 		}
 	}
 
-	// Write file to disk
+	// Names are content hashes, so re-uploading the same bytes rewrites an
+	// existing path. Renaming into place keeps the old inode intact for any
+	// request already streaming it.
 	dst := filepath.Join(dir, node.name)
-	out, err := os.Create(dst)
+	out, err := os.CreateTemp(dir, node.name+".*")
 	if err != nil {
 		return "", node, err
 	}
 	defer func() {
+		if err := os.Remove(out.Name()); err != nil && !os.IsNotExist(err) {
+			slog.Error("Failed to remove temp file", "file", out.Name(), "error", err)
+		}
+	}()
+
+	if _, err := io.Copy(out, bytes.NewReader(buf)); err != nil {
 		if err := out.Close(); err != nil {
 			slog.Error("Failed to close file", "error", err)
 		}
-	}()
-	_, err = io.Copy(out, bytes.NewReader(buf))
-	if err != nil {
+		return "", node, err
+	}
+	if err := out.Close(); err != nil {
+		return "", node, err
+	}
+	if err := os.Chmod(out.Name(), 0o644); err != nil {
+		return "", node, err
+	}
+	if err := os.Rename(out.Name(), dst); err != nil {
 		return "", node, err
 	}
 	return dst, node, nil
