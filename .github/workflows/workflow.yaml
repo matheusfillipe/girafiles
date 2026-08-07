@@ -21,6 +21,10 @@ jobs:
         with:
           python-version: '3.12'
       - uses: pre-commit/action@v3.0.1
+        env:
+          # autoupdate rewrites .pre-commit-config.yaml, which pre-commit reports
+          # as a failure. It runs against --all-files here, so it always fires.
+          SKIP: pre-commit-autoupdate
 
       - name: Run Tests
         run: |
