@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -115,12 +116,16 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 func setCORSHeaders(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
-	c.Header("Access-Control-Expose-Headers", "Content-Type, Content-Length")
+	c.Header("Access-Control-Expose-Headers", "Content-Type, Content-Length, Content-Range, Accept-Ranges")
+}
+
+func isNotFound(err error) bool {
+	return os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result")
 }
 
 func deliverHead(c *gin.Context, err error, mime string, size int64) {
 	if err != nil {
-		if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
+		if isNotFound(err) {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -128,32 +133,59 @@ func deliverHead(c *gin.Context, err error, mime string, size int64) {
 		return
 	}
 	setCORSHeaders(c)
+	c.Header("Accept-Ranges", "bytes")
 	c.Header("Content-Type", mime)
 	c.Header("Content-Length", fmt.Sprintf("%d", size))
 	c.Status(http.StatusOK)
 }
 
-func deliverFile(c *gin.Context, err error, file fileResponse, download bool) {
+// http.ServeContent streams the file and answers Range requests, which media
+// players need to seek.
+func serveFile(c *gin.Context, err error, path string, mime string, shortname string, download bool) {
 	if err != nil {
-		if os.IsNotExist(err) || strings.Contains(err.Error(), "no rows in result") {
+		if isNotFound(err) {
 			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
+
 	// If mime type is supported to be displayed in the browser, display it.
 	// otherwise, download it.
-	if isSupportedMimetype(file.mimetype) && !download {
-		setCORSHeaders(c)
-		c.Data(http.StatusOK, file.mimetype, file.content)
+	if !isSupportedMimetype(mime) && !download {
+		c.Redirect(308, fmt.Sprintf("/info/%s", shortname))
 		return
-	} else if download {
-		setCORSHeaders(c)
-		c.Header("Content-Disposition", "attachment; filename="+file.name)
-		c.Data(http.StatusOK, file.mimetype, file.content)
-	} else {
-		c.Redirect(308, fmt.Sprintf("/info/%s", file.shortname))
 	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		if isNotFound(err) {
+			c.HTML(http.StatusNotFound, "404.tmpl", gin.H{})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			slog.Error("Failed to close file", "error", err)
+		}
+	}()
+
+	info, err := f.Stat()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	name := filepath.Base(path)
+	setCORSHeaders(c)
+	c.Header("Content-Type", mime)
+	if download {
+		c.Header("Content-Disposition", "attachment; filename="+name)
+	}
+	http.ServeContent(c.Writer, c.Request, name, info.ModTime(), f)
 }
 func postFile(contentType string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -264,8 +296,8 @@ func StartServer() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err})
 			return
 		}
-		file, err := Download(f.Name)
-		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
+		path, mime, err := Locate(f.Name)
+		serveFile(c, err, path, mime, f.Name, c.Request.URL.Query().Get("download") != "")
 	})
 	// CORS preflight for file routes — browsers send OPTIONS when the GET carries
 	// custom headers (e.g. Range from probe-via-GET-bytes-0-0).
@@ -326,8 +358,8 @@ func StartServer() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err})
 			return
 		}
-		file, err := DownloadFromBucket(fb.Bucket, fb.Name)
-		deliverFile(c, err, file, c.Request.URL.Query().Get("download") != "")
+		path, mime, err := LocateFromBucket(fb.Bucket, fb.Name)
+		serveFile(c, err, path, mime, fb.Name, c.Request.URL.Query().Get("download") != "")
 	})
 	files.HEAD("/:name/:alias", func(c *gin.Context) {
 		var fb FileBucket

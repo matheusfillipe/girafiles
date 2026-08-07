@@ -31,10 +31,9 @@ type Node struct {
 }
 
 type fileResponse struct {
-	name      string
-	shortname string
-	mimetype  string
-	content   []byte
+	name     string
+	mimetype string
+	content  []byte
 }
 
 func getFileHash(reader io.Reader) (string, error) {
@@ -187,7 +186,7 @@ func UploadToBucket(src io.Reader, ip string, bucket string, name string) (strin
 	return node.shortname, err
 }
 
-func loadFromDisk(name string, shortname string) (fileResponse, error) {
+func loadFromDisk(name string) (fileResponse, error) {
 	settings := GetSettings()
 
 	name = strings.SplitN(name, "@", 2)[0]
@@ -202,13 +201,14 @@ func loadFromDisk(name string, shortname string) (fileResponse, error) {
 	m := mimetype.Detect(b).String()
 
 	return fileResponse{
-		shortname: shortname,
-		name:      name,
-		mimetype:  m,
-		content:   b,
+		name:     name,
+		mimetype: m,
+		content:  b,
 	}, nil
 }
 
+// Reads the whole file into memory. Only for the routes that render contents
+// into a page. Use Locate for delivery.
 func Download(n string) (fileResponse, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
@@ -219,19 +219,42 @@ func Download(n string) (fileResponse, error) {
 		return fileResponse{}, err
 	}
 
-	return loadFromDisk(name, n)
+	return loadFromDisk(name)
 }
 
-func DownloadFromBucket(bucket string, alias string) (fileResponse, error) {
+func locate(name string) (string, string, error) {
+	dst := filepath.Join(GetSettings().GetFileStoragePath(), strings.SplitN(name, "@", 2)[0])
+	m, _, err := getMimeAndSize(name)
+	if err != nil {
+		return "", "", err
+	}
+	return dst, m, nil
+}
+
+// Resolve a short name to its path on disk and mimetype, without reading the
+// contents, so delivery can stream and honour Range requests.
+func Locate(n string) (string, string, error) {
+	storageLock.Lock()
+	defer storageLock.Unlock()
+
+	name, err := GetDB().checkShortName(n)
+	if err != nil {
+		log.Println(err)
+		return "", "", err
+	}
+	return locate(name)
+}
+
+func LocateFromBucket(bucket string, alias string) (string, string, error) {
 	storageLock.Lock()
 	defer storageLock.Unlock()
 
 	name, err := GetDB().checkAlias(bucket, alias)
 	if err != nil {
 		log.Println(err)
-		return fileResponse{}, err
+		return "", "", err
 	}
-	return loadFromDisk(name, alias)
+	return locate(name)
 }
 
 func getMimeAndSize(name string) (string, int64, error) {
