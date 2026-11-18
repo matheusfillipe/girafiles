@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -20,6 +21,15 @@ import (
 const FILEDIR = "data"
 
 var storageLock = &sync.Mutex{}
+
+var (
+	ErrFileTooLarge = errors.New("file is too large")
+	ErrEmptyFile    = errors.New("file is empty, pick one with content")
+)
+
+func fileTooLargeError() error {
+	return fmt.Errorf("%w, pick one under %dMB", ErrFileTooLarge, GetSettings().FileSizeLimit)
+}
 
 type Node struct {
 	name      string
@@ -68,10 +78,10 @@ func saveToDisk(src io.Reader, filename string, ip string) (string, *Node, error
 		return "", nil, err
 	}
 	if len(buf) == 0 {
-		return "", nil, fmt.Errorf("File is empty")
+		return "", nil, ErrEmptyFile
 	}
-	if len(buf)/1024/1024 > settings.FileSizeLimit {
-		return "", nil, fmt.Errorf("File size limit exceeded. Limit is %dMB", settings.FileSizeLimit)
+	if limit := settings.FileSizeLimitBytes(); limit > 0 && int64(len(buf)) > limit {
+		return "", nil, fileTooLargeError()
 	}
 
 	// Parse file and create node

@@ -69,6 +69,11 @@ func randomJpegBytes(size int) io.Reader {
 }
 
 func uploadFile(t *testing.T, url string, file io.Reader, expecServerError bool, headers map[string]string) map[string]string {
+	_, parsed := uploadFileStatus(t, url, file, expecServerError, headers)
+	return parsed
+}
+
+func uploadFileStatus(t *testing.T, url string, file io.Reader, expecServerError bool, headers map[string]string) (int, map[string]string) {
 	formBody := &bytes.Buffer{}
 	writer := multipart.NewWriter(formBody)
 	part, err := writer.CreateFormFile("file", "file.jpg")
@@ -119,12 +124,12 @@ func uploadFile(t *testing.T, url string, file io.Reader, expecServerError bool,
 	err = json.Unmarshal(body, &parsed)
 	if err != nil {
 		if expecServerError {
-			return nil
+			return resp.StatusCode, nil
 		}
 		t.Fatalf("Failed to parse json: %s", body)
 	}
 
-	return parsed
+	return resp.StatusCode, parsed
 }
 
 func getFile(t *testing.T, url string) io.Reader {

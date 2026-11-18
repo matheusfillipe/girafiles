@@ -18,6 +18,8 @@ import (
 const DUP_ENTRY_ERROR = "UNIQUE constraint failed: files.filename"
 const DUP_ALIAS_ERROR = "UNIQUE constraint failed: files.bucket, files.alias"
 
+var ErrRateLimited = errors.New("upload limit reached")
+
 func openDatabase() *sql.DB {
 	settings := GetSettings()
 
@@ -102,13 +104,13 @@ func (db *DBHelper) CheckRateLimit(ip string) error {
 	hits := db.getHitCounts(ip)
 
 	if settings.IPMinRateLimit > 0 && hits.minute >= settings.IPMinRateLimit {
-		return errors.New("rate limit per minute exceeded")
+		return fmt.Errorf("%w for this minute, try again later", ErrRateLimited)
 	}
 	if settings.IPHourRateLimit > 0 && hits.hour >= settings.IPHourRateLimit {
-		return errors.New("rate limit per hour exceeded")
+		return fmt.Errorf("%w for this hour, try again later", ErrRateLimited)
 	}
 	if settings.IPDayRateLimit > 0 && hits.day >= settings.IPDayRateLimit {
-		return errors.New("rate limit per day exceeded")
+		return fmt.Errorf("%w for today, try again tomorrow", ErrRateLimited)
 	}
 	return nil
 }

@@ -26,7 +26,7 @@ type Settings struct {
 	StorePath string
 	// File persistance time in hours. 0 to keep files forever
 	FilePersistanceTime int
-	// File size limit in MB
+	// File size limit in MB. 0 to disable
 	FileSizeLimit int
 	// Size limit for STORE_PATH in MB. If exceeded, the oldest files will be deleted first. Set to 0 to disable
 	StorePathSizeLimit int
@@ -76,6 +76,11 @@ func (s *Settings) IsIPRateLimitEnabled() bool {
 
 func (s *Settings) IsStorePathSizeLimitEnabled() bool {
 	return s.StorePathSizeLimit > 0
+}
+
+// Zero means uploads have no size limit.
+func (s *Settings) FileSizeLimitBytes() int64 {
+	return int64(s.FileSizeLimit) * 1024 * 1024
 }
 
 func (s *Settings) GetFileStoragePath() string {

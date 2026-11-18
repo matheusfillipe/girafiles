@@ -25,9 +25,30 @@ func TestApi(t *testing.T) {
 	t.Log("Running tests on", baseUrl)
 
 	// File too large
-	jerr := uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*11), true, nil)
-	if _, ok := jerr["error"]; !ok {
-		t.Fatalf("Expected size limit error to exist. Response was: %v", jerr)
+	status, jerr := uploadFileStatus(t, baseUrl+"/api/", randomJpegBytes(1024*1024*11), true, nil)
+	if _, ok := jerr["error"]; !ok || status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("Expected size limit error with status 413. Got %d: %v", status, jerr)
+	}
+
+	status, jerr = uploadFileStatus(t, baseUrl+"/api/", randomJpegBytes(1024*1024*10+1), true, nil)
+	if status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("Expected status 413 for a file just over the limit. Got %d: %v", status, jerr)
+	}
+
+	// Raw body upload to a bucket
+	req, err := http.NewRequest("PUT", baseUrl+"/api/bigbucket/big.jpg", randomJpegBytes(1024*1024*11))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("Expected status 413 for an oversized bucket upload. Got %d", resp.StatusCode)
 	}
 
 	// File we keep track of
@@ -60,9 +81,9 @@ func TestApi(t *testing.T) {
 	}
 
 	// Upload file after minute rate limit
-	jerr = uploadFile(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), true, nil)
-	if _, ok := jerr["error"]; !ok {
-		t.Fatalf("Expected rate limit error to exist. Response was: %v", jerr)
+	status, jerr = uploadFileStatus(t, baseUrl+"/api/", randomJpegBytes(1024*1024*9), true, nil)
+	if _, ok := jerr["error"]; !ok || status != http.StatusTooManyRequests {
+		t.Fatalf("Expected rate limit error with status 429. Got %d: %v", status, jerr)
 	}
 
 	// Change time in database to simulate 5 minutes later
@@ -129,7 +150,7 @@ func TestApi(t *testing.T) {
 	}
 
 	// The first file should be deleted now for time limit
-	resp, err := http.Get(firstUrl)
+	resp, err = http.Get(firstUrl)
 	if err != nil {
 		t.Fatal(err)
 	}

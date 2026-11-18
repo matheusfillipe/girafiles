@@ -154,6 +154,28 @@
           $('input.select2-search__field').prop('placeholder', 'Choose a language');
         });
       });
+      const MAX_FILE_BYTES = {{ .maxFileBytes }};
+
+      function isTooLarge(size) {
+        return MAX_FILE_BYTES > 0 && size > MAX_FILE_BYTES;
+      }
+
+      function tooLargeMessage() {
+        return `File is too large. Pick one under ${formatFileSize(MAX_FILE_BYTES)}`;
+      }
+
+      function uploadErrorMessage(status, responseText) {
+        try {
+          const body = JSON.parse(responseText);
+          if (body.error) return body.error;
+        } catch (e) {
+          if (!(e instanceof SyntaxError)) throw e;
+        }
+        // A reverse proxy can reject the body with its own HTML 413 page.
+        if (status === 413) return MAX_FILE_BYTES > 0 ? tooLargeMessage() : 'File is too large, pick a smaller one';
+        return `Upload failed with status ${status}, try again`;
+      }
+
       function submitPaste() {
         // Get the code and selected language
         const code = document.getElementById('code-input').value.trim();
@@ -164,16 +186,25 @@
           return;
         }
 
+        const blob = new Blob([code], {type: 'text/plain'});
+        if (isTooLarge(blob.size)) {
+          alert(tooLargeMessage());
+          return;
+        }
+
         // Submit as a form with file contents to the API
         var form = new FormData();
-        form.append('file', new Blob([code], {type: 'text/plain'}), 'file');
+        form.append('file', blob, 'file');
         fetch('/api/', {
           method: 'POST',
           body: form,
-        }).then((res) => res.json()).then((data) => {
+        }).then(async (res) => {
+          const text = await res.text();
+          if (!res.ok) throw new Error(uploadErrorMessage(res.status, text));
+          const data = JSON.parse(text);
           const param = language ? `?l=${language}` : '';
           window.location.href = `${data.url}/p${param}`;
-        });
+        }).catch((error) => alert('Paste failed, try again: ' + error.message));
       }
 
       // File staging functionality
@@ -197,6 +228,13 @@
 
       function stageFiles(files) {
         if (files.length === 0) return;
+
+        const tooLarge = files.filter(file => isTooLarge(file.size));
+        if (tooLarge.length > 0) {
+          alert(`These files are over the ${formatFileSize(MAX_FILE_BYTES)} limit, pick smaller ones:\n` +
+            tooLarge.map(file => `${file.name} (${formatFileSize(file.size)})`).join('\n'));
+          files = files.filter(file => !isTooLarge(file.size));
+        }
 
         // Add files to staging area (avoid duplicates by name)
         files.forEach(file => {
@@ -269,42 +307,6 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
       }
 
-      function uploadFileWithProgress(file, onProgress) {
-        return new Promise((resolve, reject) => {
-          const form = new FormData();
-          form.append('file', file);
-
-          const xhr = new XMLHttpRequest();
-
-          xhr.upload.addEventListener('progress', (e) => {
-            if (e.lengthComputable) {
-              const percentComplete = (e.loaded / e.total) * 100;
-              onProgress(percentComplete);
-            }
-          });
-
-          xhr.addEventListener('load', () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const result = JSON.parse(xhr.responseText);
-                resolve(result);
-              } catch (e) {
-                reject(new Error('Invalid response format'));
-              }
-            } else {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
-            }
-          });
-
-          xhr.addEventListener('error', () => {
-            reject(new Error('Network error during upload'));
-          });
-
-          xhr.open('POST', '/api/');
-          xhr.send(form);
-        });
-      }
-
       async function uploadAllFiles() {
         if (stagedFiles.length === 0) {
           alert('No files to upload');
@@ -336,7 +338,7 @@
 
             progressText.textContent = `Uploading ${i + 1}/${stagedFiles.length}: ${file.name}`;
 
-            const result = await uploadFileWithProgress(file, (fileProgress) => {
+            const result = await uploadBlobWithProgress(file, file.name, (fileProgress) => {
               // Calculate bytes uploaded for current file
               const currentFileBytes = (fileProgress / 100) * fileSize;
               // Total progress is (previously uploaded + current file progress) / total
@@ -539,6 +541,10 @@
 
       function uploadBlobWithProgress(blob, filename, onProgress) {
         return new Promise((resolve, reject) => {
+          if (isTooLarge(blob.size)) {
+            reject(new Error(tooLargeMessage()));
+            return;
+          }
           const form = new FormData();
           form.append('file', blob, filename);
 
@@ -560,7 +566,7 @@
                 reject(new Error('Invalid response format'));
               }
             } else {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
+              reject(new Error(uploadErrorMessage(xhr.status, xhr.responseText)));
             }
           });
 

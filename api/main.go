@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -72,6 +73,33 @@ func (fb FileBucket) GetName() string {
 	return fb.Name
 }
 
+func respondUploadError(c *gin.Context, err error) {
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		err = fileTooLargeError()
+	}
+	status := http.StatusInternalServerError
+	switch {
+	case errors.Is(err, ErrFileTooLarge):
+		status = http.StatusRequestEntityTooLarge
+	case errors.Is(err, ErrRateLimited):
+		status = http.StatusTooManyRequests
+	case errors.Is(err, ErrEmptyFile), errors.Is(err, http.ErrMissingFile):
+		status = http.StatusBadRequest
+	}
+	c.JSON(status, gin.H{"error": err.Error()})
+}
+
+// The multipart envelope adds a few headers around the file, so we allow
+// that much on top of the file size limit before cutting the body off.
+const multipartOverheadBytes = 64 * 1024
+
+func limitRequestBody(c *gin.Context, extra int64) {
+	if limit := GetSettings().FileSizeLimitBytes(); limit > 0 {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit+extra)
+	}
+}
+
 func handleUpload(c *gin.Context, filename string, err error, params url.Values, contentType string) {
 	url := fmt.Sprintf("%s/%s", getHostUrl(c.Request), filename)
 	if err != nil {
@@ -92,7 +120,7 @@ func handleUpload(c *gin.Context, filename string, err error, params url.Values,
 			}
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondUploadError(c, err)
 		return
 	}
 
@@ -189,9 +217,10 @@ func serveFile(c *gin.Context, err error, path string, mime string, shortname st
 }
 func postFile(contentType string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		limitRequestBody(c, multipartOverheadBytes)
 		file, err := c.FormFile("file")
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			respondUploadError(c, err)
 			return
 		}
 
@@ -269,7 +298,7 @@ func StartServer() {
 			return
 		}
 
-		// Receive file as request content
+		limitRequestBody(c, 0)
 		reader := c.Request.Body
 		params := c.Request.URL.Query()
 		n, err := UploadToBucket(reader, c.ClientIP(), fb.Bucket, fb.Name)
@@ -474,6 +503,7 @@ func StartServer() {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"title":          settings.AppName,
 			"filesize":       formatIntUnlimitedIf0(settings.FileSizeLimit),
+			"maxFileBytes":   settings.FileSizeLimitBytes(),
 			"persistance":    formatIntUnlimitedIf0(settings.FilePersistanceTime),
 			"ratelimit":      formatIntUnlimitedIf0(settings.IPDayRateLimit),
 			"storeLimit":     settings.IsStorePathSizeLimitEnabled(),
